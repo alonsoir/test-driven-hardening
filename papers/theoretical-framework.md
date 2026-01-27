@@ -22,7 +22,17 @@ TDH augments rather than replaces engineers. Humans act as **"Executive Presiden
 
 ## 3. Architecture
 ### 3.1 The LLM Council: Distributed Consensus
-A council of 5+ LLMs with complementary specializations provides analysis through a three-stage process: independent opinion, anonymous peer review, and synthesis. This structure minimizes individual model biases and blind spots.
+
+TDH adapts and extends the consensus architecture pioneered in **Karpathy's llm-council project** (Karpathy, 2025). While the original implements a general-purpose three-stage process (Opinion → Anonymous Review → Synthesis), TDH specializes this framework for security analysis:
+
+| llm-council (General) | TDH (Security-Specialized) |
+|----------------------|----------------------------|
+| Generic question answering | Vulnerability-specific analysis prompts |
+| "Best answer" ranking | Exploitability validation & CWE classification |
+| Single-turn responses | Evidence-driven consensus with PoC generation |
+| User-facing chat interface | CI/CD-integrated automated security advisor |
+
+This specialization transforms the council from a debate forum into a **security validation committee** that evaluates hypotheses against empirical evidence.
 
 ### 3.2 Hardening Journal: Institutional Memory
 A vector database storing structured knowledge from each TDH cycle enables semantic search and continuous learning through Retrieval-Augmented Generation (RAG).

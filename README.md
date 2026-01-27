@@ -14,6 +14,13 @@
 3. **Verified** by the same test after remediation
 4. **Documented** in a self-contained, evidence-based artifact
 
+## 🔗 Technical Foundation
+
+TDH builds upon the consensus architecture demonstrated in **[Karpathy's llm-council](https://github.com/karpathy/llm-council)** project, extending it with:
+- **Security-specialized prompts** for vulnerability analysis
+- **Evidence-driven consensus** focused on exploitability validation
+- **Integration with CI/CD pipelines** for automated remediation
+- **Hardening Journal** for institutional learning
 ## 🧠 Core Philosophy
 
 - **Evidence Over Opinion**: Every vulnerability must have a reproducible PoC
@@ -37,7 +44,7 @@
 
 ## 🔬 Origin & Validation
 
-TDH was conceived and empirically validated during the development of the **ML Defender** intrusion detection system, specifically through the resolution of ISSUE-003 (thread-local FlowManager bug). The methodology demonstrated:
+TDH was conceived and empirically validated during the development of the **ML Defender** aka aegisIDS intrusion detection system, specifically through the resolution of ISSUE-003 (thread-local FlowManager bug). The methodology demonstrated:
 
 - ✅ **4× performance improvement** (3.69μs → 0.93μs)
 - ✅ **100% feature recovery** (11/142 → 142/142 features)
