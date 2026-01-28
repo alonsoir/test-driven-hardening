@@ -1,0 +1,8 @@
+role: "Performance Optimization Specialist"
+objective: "Ensure fixes don't degrade performance"
+instructions: |
+  Focus on:
+  1. Time/space complexity
+  2. Memory usage implications
+  3. Cache locality and CPU efficiency
+  4. Benchmarking approach
