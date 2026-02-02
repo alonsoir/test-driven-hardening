@@ -1,0 +1,6 @@
+# GitHub Repository Analyzer
+gitpython>=3.1
+requests>=2.31
+click>=8.0
+rich>=13.0      # Para output bonito
+pygments>=2.15  # Resaltado de sintaxis

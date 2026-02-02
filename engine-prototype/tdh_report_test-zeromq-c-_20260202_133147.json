@@ -1,0 +1,558 @@
+{
+  "repository": "test-zeromq-c-",
+  "analysis_date": "2026-02-02T13:31:47.444715",
+  "files_analyzed": 344,
+  "vulnerabilities": [
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/sniffer/include/config_types.h",
+      "line": 64,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "std::string config_file = \"../config/sniffer.json\";"
+    },
+    {
+      "type": "CWE-401",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/sniffer/src/userspace/thread_manager.cpp",
+      "line": 568,
+      "severity": "MEDIUM",
+      "message": "Potential memory leak",
+      "code": "return malloc(size);"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/sniffer/src/userspace/dual_nic_manager.cpp",
+      "line": 191,
+      "severity": "HIGH",
+      "message": "Use of system() with potential command injection",
+      "code": "int ret = system(\"sysctl -w net.ipv4.ip_forward=1 > /dev/null 2>&1\");"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/sniffer/src/userspace/dual_nic_manager.cpp",
+      "line": 198,
+      "severity": "HIGH",
+      "message": "Use of system() with potential command injection",
+      "code": "ret = system(\"sysctl -w net.ipv6.conf.all.forwarding=1 > /dev/null 2>&1\");"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-detector/src/zmq_handler.cpp",
+      "line": 116,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "\"../config/rag_logger_config.json\","
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-detector/src/main.cpp",
+      "line": 47,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "std::cout << \"  --config <path>    Path to configuration file (default: ../config/ml_detector_config"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-detector/src/main.cpp",
+      "line": 68,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "std::string config_path = \"../config/ml_detector_config.json\";"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/etcd-server/src/component_registry.cpp",
+      "line": 399,
+      "severity": "HIGH",
+      "message": "Use of system() with potential command injection",
+      "code": "int result = system(cmd.c_str());"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/include/rag/config_manager.hpp",
+      "line": 35,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "bool loadFromFile(const std::string& config_path = \"../config/rag-config.json\");"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/tests/create_dummy_model_lite.py",
+      "line": 14,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/tests/create_dummy_model.py",
+      "line": 13,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/models/preflight_check.py",
+      "line": 8,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/models/preflight_check.py",
+      "line": 9,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/scripts/verify_script.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/scripts/verify_script.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/rag/src/main.cpp",
+      "line": 127,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "if (!config_manager.loadFromFile(\"../config/rag-config.json\")) {"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/contrib/claude/pca_pipeline/convert_pca_to_onnx.py",
+      "line": 10,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/contrib/claude/pca_pipeline/train_pca_embedder.py",
+      "line": 10,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/main.cpp",
+      "line": 139,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "std::string config_path = \"../config/firewall.json\";"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/etcd_client.cpp",
+      "line": 88,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "std::ifstream config_file(\"../config/firewall.json\");  // ← CAMBIAR A ../config/"
+    },
+    {
+      "type": "CWE-22",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/etcd_client.cpp",
+      "line": 90,
+      "severity": "MEDIUM",
+      "message": "Hardcoded relative path to config",
+      "code": "std::cerr << \"❌ [firewall-acl-agent] Failed to open ../config/firewall.json\" << std::endl;"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/iptables_wrapper.cpp",
+      "line": 99,
+      "severity": "HIGH",
+      "message": "Use of popen() with potential command injection",
+      "code": "FILE* pipe = popen(cmd.c_str(), \"r\");"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/iptables_wrapper.cpp",
+      "line": 199,
+      "severity": "HIGH",
+      "message": "Use of system() with potential command injection",
+      "code": "int ret = system(cmd.c_str());"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/iptables_wrapper.cpp",
+      "line": 245,
+      "severity": "HIGH",
+      "message": "Use of popen() with potential command injection",
+      "code": "FILE* pipe = popen(cmd.c_str(), \"r\");"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/iptables_wrapper.cpp",
+      "line": 428,
+      "severity": "HIGH",
+      "message": "Use of popen() with potential command injection",
+      "code": "FILE* pipe = popen(cmd.c_str(), \"r\");"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/ipset_wrapper.cpp",
+      "line": 97,
+      "severity": "HIGH",
+      "message": "Use of popen() with potential command injection",
+      "code": "FILE* pipe = popen(cmd.c_str(), \"r\");"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/ipset_wrapper.cpp",
+      "line": 199,
+      "severity": "HIGH",
+      "message": "Use of system() with potential command injection",
+      "code": "int ret = system(cmd.c_str());"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/ipset_wrapper.cpp",
+      "line": 213,
+      "severity": "HIGH",
+      "message": "Use of popen() with potential command injection",
+      "code": "FILE* pipe = popen(\"ipset list -n 2>/dev/null\", \"r\");"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/ipset_wrapper.cpp",
+      "line": 450,
+      "severity": "HIGH",
+      "message": "Use of system() with potential command injection",
+      "code": "int ret = system(cmd.c_str());"
+    },
+    {
+      "type": "CWE-78",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/firewall-acl-agent/src/core/ipset_wrapper.cpp",
+      "line": 529,
+      "severity": "HIGH",
+      "message": "Use of popen() with potential command injection",
+      "code": "FILE* pipe = popen(cmd.c_str(), \"r\");"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/export_rag_to_csv.py",
+      "line": 12,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/generate_traffic.py",
+      "line": 14,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/analyze_dual_scores.py",
+      "line": 16,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/analyze_rag_logs.py",
+      "line": 11,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/analyze-tsan-reports.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/analyze-tsan-reports.py",
+      "line": 5,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/plot_metrics.py",
+      "line": 7,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/testing/send_fake_detection.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/scripts/testing/attack_generator.py",
+      "line": 11,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/generate_all_models.py",
+      "line": 2,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/generate_all_models.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: subprocess",
+      "code": "import subprocess"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/generate_all_models.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/check_system_config.py",
+      "line": 7,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/check_system_config.py",
+      "line": 24,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: subprocess",
+      "code": "import subprocess"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/verify_all_models_normalization.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ddos_detection/GenerateDDOSCPPForest.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ddos_detection/GenerateDDOSCPPForest.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ddos_detection/DDosModelTrainer.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/rag_shield/RAGShieldCleaner.py",
+      "line": 6,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/rag_shield/UltimateRAGShieldTrainer.py",
+      "line": 13,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/train_robust_universal.py",
+      "line": 8,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/validate_simple_cross_domain.py",
+      "line": 7,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/train_simple_effective.py",
+      "line": 9,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/create_guaranteed_ransomware.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/extract_model_params_claude.py",
+      "line": 6,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/validate_cross_domain.py",
+      "line": 8,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/extreme_validation.py",
+      "line": 8,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/ransomware/create_test_datasets.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: os",
+      "code": "import os"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/internal_traffic/InternalModelTrainer.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/internal_traffic/GenerateInternalCPPForest.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/internal_traffic/GenerateInternalCPPForest.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/external_traffic/GenerateTrafficCPPForest.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/external_traffic/GenerateTrafficCPPForest.py",
+      "line": 4,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: sys",
+      "code": "import sys"
+    },
+    {
+      "type": "CWE-96",
+      "file": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tdh_github_cache/test-zeromq-c-/ml-training/scripts/external_traffic/TrafficModelTrainer.py",
+      "line": 3,
+      "severity": "MEDIUM",
+      "message": "Import of potentially dangerous module: pickle",
+      "code": "import pickle"
+    }
+  ],
+  "metrics": {
+    "total_issues": 64,
+    "by_severity": {
+      "CRITICAL": 0,
+      "HIGH": 12,
+      "MEDIUM": 52,
+      "LOW": 0
+    },
+    "by_type": {
+      "CWE-22": 9,
+      "CWE-401": 1,
+      "CWE-78": 12,
+      "CWE-96": 42
+    }
+  },
+  "repo_info": {
+    "name": "test-zeromq-c-",
+    "commit_count": 307,
+    "branches": [
+      "main"
+    ],
+    "active_branch": "main",
+    "languages": {
+      "JavaScript": 247,
+      "JSON": 226,
+      "Markdown": 211,
+      "C++": 147,
+      "C++ Header": 103,
+      "Python": 80,
+      "C/C++ Header": 12,
+      "CSS": 8,
+      "YAML": 4,
+      "TypeScript": 3,
+      "HTML": 2,
+      "C": 1
+    },
+    "last_commit": "2026-01-31 18:30:20+01:00",
+    "author": "@alonso_isidoro"
+  }
+}
