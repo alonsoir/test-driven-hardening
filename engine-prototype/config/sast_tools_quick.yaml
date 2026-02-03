@@ -1,0 +1,51 @@
+# engine-prototype/config/sast_tools_quick.yaml
+global:
+  min_severity: "MEDIUM"
+  timeout_per_tool: 30
+  parallel_execution: false
+  max_issues_per_file: 20
+
+tools:
+  semgrep:
+    enabled: true
+    command: "semgrep"
+    args:
+      base: ["--json", "--quiet", "--config", "auto"]
+    file_extensions: [".py", ".js", ".ts", ".java", ".c", ".cpp"]
+    output_format: "json"
+    severity_mapping:
+      ERROR: "CRITICAL"
+      WARNING: "HIGH"
+      INFO: "MEDIUM"
+  
+  bandit:
+    enabled: true
+    command: "bandit"
+    args:
+      base: ["-f", "json", "--skip", "B101,B102"]
+    file_extensions: [".py"]
+    output_format: "json"
+  
+  cppcheck:
+    enabled: true
+    command: "cppcheck"
+    args:
+      base: ["--enable=warning,style,performance,portability", "--inline-suppr"]
+    file_extensions: [".c", ".cpp", ".h", ".hpp"]
+    output_format: "text"  # Usar texto en lugar de XML para pruebas
+
+exclusions:
+  global:
+    directories:
+      - "**/node_modules/**"
+      - "**/.git/**"
+      - "**/__pycache__/**"
+      - "**/venv/**"
+      - "**/*.egg-info/**"
+      - "**/dist/**"
+      - "**/build/**"
+
+reporting:
+  default_format: "console"
+  output_dir: "reports/sast"
+  include_code_snippets: true

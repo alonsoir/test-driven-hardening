@@ -1,0 +1,13 @@
+# engine-prototype/tdh
+#!/bin/bash
+# Wrapper para TDH Engine
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Activar entorno virtual si existe
+if [ -f "$DIR/venv/bin/activate" ]; then
+    source "$DIR/venv/bin/activate"
+fi
+
+# Ejecutar comando
+python "$DIR/src/core/sast_orchestrator.py" "$@"
