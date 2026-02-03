@@ -1,0 +1,332 @@
+# SAST Tools Configuration for TDH Engine
+# Configuración de herramientas de análisis estático de seguridad
+
+# Global SAST settings
+global:
+  # Minimum severity to report (CRITICAL, HIGH, MEDIUM, LOW, INFO)
+  min_severity: "MEDIUM"
+  
+  # Timeout per tool in seconds
+  timeout_per_tool: 60
+  
+  # Maximum issues per file to prevent spam
+  max_issues_per_file: 50
+  
+  # Parallel execution
+  parallel_execution: true
+  max_parallel_jobs: 4
+
+# Tool-specific configurations
+tools:
+  # --- Python Tools ---
+  bandit:
+    enabled: true
+    command: "bandit"
+    args:
+      base: ["-f", "json", "--quiet"]
+      scan_mode: ["-r"]  # Recursive directory scanning
+      severity: ["--severity-level", "MEDIUM"]
+      confidence: ["--confidence-level", "MEDIUM"]
+    file_extensions: [".py"]
+    output_format: "json"
+    severity_mapping:
+      HIGH: "CRITICAL"
+      MEDIUM: "HIGH"
+      LOW: "MEDIUM"
+  
+  safety:
+    enabled: true
+    command: "safety"
+    args:
+      base: ["check", "--json"]
+      scan_mode: ["--file"]
+    file_extensions: [".py", "requirements.txt", "pyproject.toml", "setup.py"]
+    output_format: "json"
+    severity_mapping:
+      CRITICAL: "CRITICAL"
+      HIGH: "HIGH"
+      MEDIUM: "MEDIUM"
+      LOW: "LOW"
+  
+  pylint_security:
+    enabled: false  # Disabled by default as it's part of pylint
+    command: "pylint"
+    args:
+      base: ["--disable=all", "--enable=security", "--output-format=json"]
+    file_extensions: [".py"]
+    output_format: "json"
+    severity_mapping:
+      error: "HIGH"
+      warning: "MEDIUM"
+      convention: "LOW"
+  
+  # --- C/C++ Tools ---
+    cppcheck:
+    enabled: true
+    command: "cppcheck"
+    args:
+      base: ["--enable=all", "--output-file=-"]  # Usar salida estándar en lugar de archivo
+    file_extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"]
+    output_format: "text"
+    severity_mapping:
+      error: "CRITICAL"
+      warning: "HIGH"
+      style: "MEDIUM"
+      performance: "LOW"
+      information: "INFO"
+  
+  flawfinder:
+    enabled: true
+    command: "flawfinder"
+    args:
+      base: ["--quiet", "--dataonly"]
+      min_level: ["--minlevel=3"]
+    file_extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"]
+    output_format: "text"
+    severity_mapping:
+      "5": "CRITICAL"
+      "4": "HIGH"
+      "3": "MEDIUM"
+      "2": "LOW"
+      "1": "INFO"
+  
+  clang_tidy_security:
+    enabled: false  # Requires compilation database
+    command: "clang-tidy"
+    args:
+      base: ["-checks=security-*,bugprone-*,cert-*", "--format=json"]
+    file_extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"]
+    output_format: "json"
+    requires_compilation_db: true
+  
+  # --- Multi-language Tools ---
+  semgrep:
+    enabled: true
+    command: "semgrep"
+    args:
+      base: ["--json", "--quiet"]
+      config: ["--config", "auto"]
+      severity: ["--severity", "ERROR", "WARNING"]
+    file_extensions: 
+      - ".py"
+      - ".js"
+      - ".ts"
+      - ".java"
+      - ".c"
+      - ".cpp"
+      - ".go"
+      - ".rb"
+      - ".php"
+      - ".cs"
+    output_format: "json"
+    severity_mapping:
+      ERROR: "CRITICAL"
+      WARNING: "HIGH"
+      INFO: "MEDIUM"
+    # Custom rulesets
+    rulesets:
+      - "p/security-audit"
+      - "p/owasp-top-ten"
+      - "p/secrets"
+  
+  # --- Java Tools ---
+  spotbugs:
+    enabled: true
+    command: "spotbugs"
+    args:
+      base: ["-textui", "-effort:max"]
+      output: ["-xml:withMessages"]
+    file_extensions: [".java", ".class", ".jar"]
+    output_format: "xml"
+    severity_mapping:
+      HIGH: "CRITICAL"
+      MEDIUM: "HIGH"
+      LOW: "MEDIUM"
+  
+  checkstyle_security:
+    enabled: false
+    command: "checkstyle"
+    args:
+      base: ["-c", "/google_checks.xml", "-f", "xml"]
+    file_extensions: [".java"]
+    output_format: "xml"
+  
+  # --- JavaScript/TypeScript Tools ---
+  eslint_security:
+    enabled: true
+    command: "eslint"
+    args:
+      base: ["--format", "json", "--no-eslintrc"]
+      config: ["--config", "security.js"]
+    file_extensions: [".js", ".jsx", ".ts", ".tsx"]
+    output_format: "json"
+    requires_config_file: true
+  
+  # --- Go Tools ---
+  gosec:
+    enabled: false  # Not installed by default
+    command: "gosec"
+    args:
+      base: ["-fmt=json", "-quiet"]
+    file_extensions: [".go"]
+    output_format: "json"
+  
+  # --- Ruby Tools ---
+  brakeman:
+    enabled: false
+    command: "brakeman"
+    args:
+      base: ["-f", "json"]
+    file_extensions: [".rb", ".erb"]
+    output_format: "json"
+
+# Language-specific tool chains
+language_toolchains:
+  python:
+    primary: ["bandit", "semgrep"]
+    secondary: ["safety", "pylint_security"]
+    dependencies: ["requirements.txt", "pyproject.toml", "setup.py"]
+  
+  c_cpp:
+    primary: ["cppcheck", "semgrep"]
+    secondary: ["flawfinder"]
+    build_systems: ["makefile", "cmake", "meson"]
+  
+  java:
+    primary: ["spotbugs", "semgrep"]
+    secondary: ["checkstyle_security"]
+    build_systems: ["maven", "gradle", "ant"]
+  
+  javascript:
+    primary: ["eslint_security", "semgrep"]
+    package_managers: ["npm", "yarn", "pnpm"]
+  
+  go:
+    primary: ["gosec", "semgrep"]
+  
+  ruby:
+    primary: ["brakeman", "semgrep"]
+
+# File exclusion patterns
+exclusions:
+  # Global exclusions
+  global:
+    directories:
+      - "**/node_modules/**"
+      - "**/vendor/**"
+      - "**/dist/**"
+      - "**/build/**"
+      - "**/.git/**"
+      - "**/__pycache__/**"
+      - "**/target/**"
+      - "**/.idea/**"
+      - "**/.vscode/**"
+    
+    files:
+      - "**/*.min.js"
+      - "**/*.min.css"
+      - "**/*.bundle.js"
+      - "**/*.log"
+      - "**/package-lock.json"
+      - "**/yarn.lock"
+  
+  # Tool-specific exclusions
+  tool_specific:
+    cppcheck:
+      - "**/test_*.cpp"
+      - "**/*_test.cpp"
+    
+    bandit:
+      - "**/test_*.py"
+      - "**/*_test.py"
+
+# Report configuration
+reporting:
+  # Output formats
+  formats:
+    - "json"
+    - "html"
+    - "sarif"
+    - "console"
+  
+  # Default format
+  default_format: "json"
+  
+  # Output directory
+  output_dir: "reports/sast"
+  
+  # Group by (severity, tool, file, language)
+  group_by: ["severity", "language"]
+  
+  # Include code snippets
+  include_code_snippets: true
+  snippet_context_lines: 3
+  
+  # Statistics to include
+  statistics:
+    - "total_issues"
+    - "issues_by_severity"
+    - "issues_by_tool"
+    - "issues_by_language"
+    - "top_files"
+  
+  # Create summary report
+  create_summary: true
+
+# CI/CD integration
+ci_cd:
+  # Fail build on severity threshold
+  fail_on_severity: "HIGH"
+  
+  # Create SARIF output for GitHub Code Scanning
+  github_code_scanning: true
+  
+  # Create GitLab SAST report
+  gitlab_sast: false
+  
+  # Thresholds for regression
+  regression_thresholds:
+    critical: 0
+    high: 2
+    medium: 10
+    low: 50
+  
+  # Comment on PR
+  pr_comment: true
+  pr_comment_min_severity: "HIGH"
+
+# Performance tuning
+performance:
+  # Cache results
+  use_cache: true
+  cache_dir: ".tdh_cache/sast"
+  cache_ttl_hours: 24
+  
+  # Skip unchanged files
+  skip_unchanged: true
+  
+  # Resource limits
+  max_memory_mb: 4096
+  max_cpu_percent: 80
+
+# Custom rules configuration
+custom_rules:
+  # Directory for custom semgrep rules
+  semgrep_rules_dir: "rules/semgrep"
+  
+  # Custom bandit config
+  bandit_config: "config/bandit.yml"
+  
+  # Custom eslint config
+  eslint_config: "config/eslint_security.js"
+  
+  # Enable/disable rule categories
+  rule_categories:
+    sql_injection: true
+    xss: true
+    command_injection: true
+    path_traversal: true
+    hardcoded_secrets: true
+    crypto_issues: true
+    auth_issues: true
+    insecure_config: true

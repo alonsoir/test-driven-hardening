@@ -1,42 +1,18 @@
-# TDH Engine Configuration
-engine:
-  name: "tdh-engine"
-  version: "0.1.0"
-  mode: "community"
-  python_version: "3.14"
-
-scoring:
-  weights:
-    complexity: 0.25
-    dependencies: 0.20
-    loc_delta: 0.15
-    test_coverage: 0.25
-    beauty: 0.15
-  acceptance_threshold: 70
-
+# Añadir o modificar la sección sast en tdh_config.yaml
 sast:
-  tools:
-    - semgrep
-    - bandit
-    - cppcheck
-  severity_filter: ["CRITICAL", "HIGH"]
-
-council:
-  providers:
-    - name: "mock"
-      type: "mock"
-      role: "architect"
-    - name: "deepseek_local"
-      type: "local"
-      role: "security_analyst"
-  max_proposals_per_vuln: 3
-
-workspace:
-  temp_dir: "/tmp/tdh_workspaces"
-  max_workspaces: 10
-  cleanup_after_hours: 24
-
-logging:
-  level: "INFO"
-  file: "logs/tdh_engine.log"
-  max_size_mb: 10
+  # Referencia al archivo de configuración de herramientas
+  config_file: "config/sast_tools.yaml"
+  
+  # Severity filter (overridable from CLI)
+  severity_filter: ["CRITICAL", "HIGH", "MEDIUM"]
+  
+  # Auto-update tools
+  auto_update: true
+  update_frequency_days: 7
+  
+  # Metadata for reports
+  metadata:
+    project_name: "{{project_name}}"
+    scan_id: "{{timestamp}}"
+    branch: "{{git_branch}}"
+    commit_hash: "{{git_commit}}"

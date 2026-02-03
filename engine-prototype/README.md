@@ -1,181 +1,328 @@
-# 🌐 GitHub Repository Analyzer
+# 🛡️ TDH Engine - Test Driven Hardening Engine
 
-Analizador de repositorios GitHub que usa AST para detectar vulnerabilidades en código.
+Motor de análisis de seguridad avanzado que combina análisis AST tradicional con herramientas SAST profesionales para detección integral de vulnerabilidades en código.
 
-## 🚀 Características
+## 🏗️ Arquitectura del Proyecto
 
-- **Análisis AST** de Python y C/C++
-- **Detección automática** de vulnerabilidades comunes (CWE-120, CWE-22, etc.)
+```
+engine-prototype/
+├── github_analyzer.py            # 🔍 Analizador tradicional AST (script independiente)
+├── src/core/
+│   ├── sast_orchestrator.py      # 🎛️ Nuevo orquestador principal de SAST
+│   ├── config_validator.py       # ✅ Validador de configuración
+│   └── (próximamente: integración con github_analyzer)
+├── config/
+│   ├── tdh_config.yaml           # ⚙️ Configuración principal
+│   └── sast_tools.yaml           # 🛠️ Configuración de herramientas SAST
+├── scripts/
+│   ├── test_sast.py              # 🧪 Pruebas del sistema SAST
+│   ├── test_sast_simple.py       # 🧪 Prueba simplificada
+│   └── install_sast_tools.sh     # 📦 Instalador de herramientas
+├── requirements.txt              # 📦 Dependencias del analizador tradicional
+├── requirements-dev.txt          # 📦 Dependencias de desarrollo
+├── reports/                      # 📊 Reportes generados
+├── logs/                         # 📝 Logs de análisis
+└── Makefile                      # 🔧 Automatización completa
+```
+
+## 🔄 Dos Enfoques de Análisis
+
+### 1. **SAST Orchestrator (Nuevo - Recomendado)**
+Sistema modular que integra múltiples herramientas SAST profesionales:
+- **Orquestación inteligente** de herramientas especializadas
+- **Configuración centralizada** en YAML
+- **Soporte multi-lenguaje** con herramientas nativas
+- **Extensible** con nuevas herramientas
+
+### 2. **GitHub Analyzer (Tradicional)**
+Script independiente para análisis AST básico:
+- **Análisis AST** para Python y C/C++
 - **Clonado automático** de repositorios GitHub
-- **Múltiples formatos de salida**: texto, JSON, HTML
+- **Formatos múltiples**: texto, JSON, HTML
+- **Compatibilidad** con el sistema anterior
+
+## 🚀 Características Principales
+
+### 🔍 **SAST Orchestrator (Moderno)**
+- **Integración profesional** con semgrep, bandit, cppcheck, etc.
+- **Configuración YAML** centralizada
+- **Detección por severidad** configurable
+- **Sistema de exclusiones** avanzado
+- **Reportes JSON/HTML** para CI/CD
+- **Entorno virtual** gestionado por Makefile
+
+### 📦 **GitHub Analyzer (Tradicional)**
+- **Análisis AST** para Python y C/C++
+- **Clonado automático** de repositorios
+- **Detección de vulnerabilidades** comunes
 - **Cache local** para análisis repetidos
-- **Detección de lenguajes** usados en el repositorio
+- **Formatos**: texto, JSON, HTML
 
-## 📦 Instalación
+## ⚡ Instalación Rápida
 
+### Opción A: Sistema SAST Moderno (Recomendado)
 ```bash
-# Clonar repositorio
-git clone https://github.com/alonsoir/test-driven-hardening.git
-cd test-driven-hardening/engine-prototype
+cd engine-prototype
+make init                    # 🎯 Inicializa entorno completo
+source venv/bin/activate     # 🔌 Activa entorno virtual
+```
 
-# Crear entorno virtual (opcional)
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+### Opción B: Analizador Tradicional
+```bash
+pip install -r requirements.txt  # Instala dependencias básicas
+python github_analyzer.py --help # Verifica funcionamiento
+```
 
-# Instalar dependencias
-pip install -r requirements.txt
+## 🎯 Uso Rápido
 
-🎯 Uso Rápido
+### Usando el Nuevo SAST Orchestrator
+```bash
+# Analizar directorio actual
+python -m src.core.sast_orchestrator .
 
-# Analizar un repositorio GitHub:
+# Con configuración personalizada
+python -m src.core.sast_orchestrator /ruta/proyecto
 
+# Usar script de prueba simplificado
+python scripts/test_sast_simple.py
+
+# Ejecutar a través del Makefile
+make run
+```
+
+### Usando el GitHub Analyzer Tradicional
+```bash
+# Analizar repositorio GitHub
 python github_analyzer.py analyze usuario/repositorio
 
-# Ejemplos:
-python github_analyzer.py analyze torvalds/linux --max-files 100
-python github_analyzer.py analyze OWASP/CheatSheetSeries --output json
-python github_analyzer.py analyze apple/swift --branch main
-python github_analyzer.py analyze https://github.com/alonsoir/test-zeromq-c- --branch main
+# Con diferentes formatos de salida
+python github_analyzer.py analyze torvalds/linux --output json
+python github_analyzer.py analyze OWASP/CheatSheetSeries --output html
 
-# Obtener información del repositorio:
-
-python github_analyzer.py info usuario/repositorio
-python github_analyzer.py info microsoft/vscode
-
-# Analizar repositorio local:
-
+# Analizar repositorio local
 python github_analyzer.py local /ruta/al/repositorio
-python github_analyzer.py local /vagrant/ml-defender --output html
+```
 
-# Ver repositorios de seguridad populares:
+## ⚙️ Configuración
 
-python github_analyzer.py trending
+### Configuración SAST Moderna (`config/sast_tools.yaml`)
+```yaml
+tools:
+  semgrep:
+    enabled: true
+    command: "semgrep"
+    args:
+      base: ["--json", "--config", "auto"]
+    file_extensions: [".py", ".js", ".java", ".c", ".cpp"]
+  
+  bandit:
+    enabled: true
+    command: "bandit"
+    args:
+      base: ["-f", "json", "--skip", "B101,B102"]
+    file_extensions: [".py"]
 
-📊 Formatos de Salida
+exclusions:
+  global:
+    directories:
+      - "**/node_modules/**"
+      - "**/.git/**"
+      - "**/__pycache__/**"
+```
 
---output text: Salida en consola con colores (por defecto)
---output json: JSON estructurado para automatización
---output html: Reporte HTML interactivo con gráficos
-🔍 Qué Detecta
+### Migración del Sistema Tradicional
+Si vienes usando `github_analyzer.py`, el nuevo sistema ofrece:
+- **Más herramientas** de análisis (semgrep, cppcheck, etc.)
+- **Mejor configuración** (YAML vs. argumentos CLI)
+- **Reportes más detallados** con estadísticas
+- **Integración CI/CD** más robusta
 
-Python:
+## 📋 Comandos Makefile (Productividad)
 
-✅ Uso de eval(), exec(), compile()
-✅ Imports peligrosos (pickle, marshal, subprocess)
-✅ Credenciales hardcodeadas (password, secret, token)
-✅ Path traversal (../, rutas relativas)
-C/C++:
+### 🏗️ Configuración
+```bash
+make setup          # Configura entorno básico
+make setup-dev      # Configura entorno de desarrollo completo
+make install-tools  # Instala herramientas SAST
+make check-env      # Verifica entorno
+make check-tools    # Verifica herramientas instaladas
+```
 
-✅ Buffer overflows (strcpy(), gets(), sprintf())
-✅ Command injection (system(), popen())
-✅ Memory leaks (malloc() sin free())
-✅ Use-after-free
-✅ Path traversal
-📈 Reporte HTML
+### 🧪 Pruebas
+```bash
+make test           # Ejecuta todas las pruebas
+make test-sast      # Prueba específica de SAST
+make test-unit      # Pruebas unitarias
+```
 
-Genera reportes interactivos con gráficos:
+### 🚀 Ejecución
+```bash
+make run            # Ejecuta SAST en directorio actual
+make lint           # Ejecuta linters
+make format         # Formatea código automáticamente
+```
 
-python github_analyzer.py analyze usuario/repositorio --output html > reporte.html
+### 🧹 Mantenimiento
+```bash
+make clean          # Limpia archivos temporales
+make clean-reports  # Limpia reportes
+make distclean      # Limpieza completa (incluye venv)
+```
 
-🔧 Dependencias
+## 📊 Formatos de Salida
 
-gitpython - Clonado de repositorios
-requests - Peticiones HTTP
-click - Interfaz de línea de comandos
-rich - Salida formateada en consola
-pygments - Resaltado de sintaxis
+### SAST Orchestrator (JSON Moderno)
+```json
+{
+  "metadata": {
+    "project": "test-driven-hardening",
+    "scan_id": "20240115_143022",
+    "tools_used": ["semgrep", "bandit"],
+    "total_issues": 12
+  },
+  "statistics": {
+    "total_files": 45,
+    "issues_by_severity": {
+      "CRITICAL": 2,
+      "HIGH": 3,
+      "MEDIUM": 7
+    }
+  }
+}
+```
 
-🏗️ Arquitectura
+### GitHub Analyzer (JSON Tradicional)
+```json
+{
+  "repository": "torvalds/linux",
+  "analysis_date": "2024-01-15",
+  "languages": ["C", "Python"],
+  "vulnerabilities": [...]
+}
+```
 
-github_analyzer.py
-├── GitHubRepositoryAnalyzer
-│   ├── clone_repository()
-│   ├── analyze_python_file()
-│   ├── analyze_cpp_file()
-│   └── generate_report()
-├── CLI (Click)
-│   ├── analyze
-│   ├── info
-│   ├── local
-│   └── trending
-└── Reporters
-    ├── Text
-    ├── JSON
-    └── HTML
+## 🔍 Qué Detecta Cada Sistema
 
-📁 Estructura del Proyecto
+### SAST Orchestrator (Herramientas Especializadas)
+- **semgrep**: 1000+ reglas comunitarias para múltiples lenguajes
+- **bandit**: Vulnerabilidades específicas de Python
+- **cppcheck**: Análisis estático profundo para C/C++
+- **safety**: Dependencias Python vulnerables
+- **flawfinder**: Fallos de seguridad en C/C++
 
-engine-prototype/
-├── github_analyzer.py      # Script principal
-├── requirements.txt        # Dependencias
-├── README.md              # Esta documentación
-├── .gitignore            # Archivos ignorados
-└── venv/                 # Entorno virtual (opcional)
+### GitHub Analyzer (AST Tradicional)
+- **Python**: `eval()`, `exec()`, `subprocess`, credenciales hardcodeadas
+- **C/C++**: `strcpy()`, `gets()`, `system()`, memory leaks
+- **Path traversal**: `../`, rutas relativas
+- **Inyecciones**: comandos, SQL (básico)
 
-🔄 Ejemplos Prácticos
+## 🎨 Integración CI/CD
 
-1. Análisis rápido:
+### Para el Nuevo SAST Orchestrator
+```yaml
+# GitHub Actions
+- name: Run TDH SAST Scan
+  run: |
+    cd engine-prototype
+    make ci-setup
+    make run
+```
 
-# Analizar primeros 50 archivos del kernel de Linux
-python github_analyzer.py analyze torvalds/linux --max-files 50
+### Para el GitHub Analyzer Tradicional
+```yaml
+# GitHub Actions
+- name: Run GitHub Analyzer
+  run: |
+    pip install -r engine-prototype/requirements.txt
+    python engine-prototype/github_analyzer.py analyze ${{ github.repository }} --output json
+```
 
-# Ver resultados en JSON
-python github_analyzer.py analyze nodejs/node --max-files 100 --output json > node_analysis.json
+## 🔧 Solución de Problemas
 
-2. Integración en CI/CD:
+### Problemas Comunes del SAST Orchestrator
+```bash
+# Error: No module named 'yaml'
+make setup  # Reinstala dependencias
 
-# Script para pipeline
-python github_analyzer.py analyze $REPO_URL --output json > security_report.json
+# Error: Herramienta no encontrada
+make install-tools  # Instala herramientas SAST
 
-# Verificar si hay vulnerabilidades críticas
-if grep -q '"severity": "CRITICAL"' security_report.json; then
-    echo "❌ Vulnerabilidades críticas encontradas"
-    exit 1
-fi
+# Error: Entorno virtual no activado
+source venv/bin/activate
+```
 
-3. Monitoreo periódico:
+### Problemas del GitHub Analyzer
+```bash
+# Error: ModuleNotFoundError
+pip install -r requirements.txt
 
-# Analizar repositorio cada semana
-python github_analyzer.py analyze mi-org/mi-proyecto --output html > reporte_$(date +%Y%m%d).html
+# Error: Repository not found
+# Verifica que el repositorio existe y es público
+```
 
-🐛 Solución de Problemas
+## 🚀 Roadmap y Evolución
 
-Error: "ModuleNotFoundError: No module named 'git'"
+### Evolución del Proyecto
+1. **Fase 1**: `github_analyzer.py` (AST tradicional) ✅
+2. **Fase 2**: `SASTOrchestrator` (herramientas SAST) 🚧 En desarrollo
+3. **Fase 3**: Integración LLM para fixes automáticos ⏳ Próximo
+4. **Fase 4**: Dashboard web y API REST ⏳ Futuro
 
-pip install gitpython
+### Compatibilidad
+- **El nuevo sistema NO reemplaza** inmediatamente el antiguo
+- **Ambos pueden coexistir** durante la transición
+- **Se recomienda migrar** al nuevo sistema para proyectos nuevos
+- **El sistema tradicional** se mantendrá para compatibilidad
 
-Error: "Repository not found"
+## 📚 Recursos Adicionales
 
-Verifica que el repositorio existe y es público
-Usa formato usuario/repositorio o URL completa
-El análisis es muy lento
+### Para el Nuevo Sistema SAST
+- [Configuración SAST](config/sast_tools.yaml) - Configuración de herramientas
+- [SAST Orchestrator](src/core/sast_orchestrator.py) - Código principal
+- [Scripts de prueba](scripts/) - Ejemplos de uso
 
-Usa --max-files para limitar archivos
-Usa --branch para analizar solo una rama
-📈 Roadmap
+### Para el Sistema Tradicional
+- [GitHub Analyzer](github_analyzer.py) - Script principal
+- [Ejemplos de uso](#) en el README original
+- [Documentación AST] en comentarios del código
 
-Análisis de más lenguajes (Java, JavaScript, Go, Rust)
-Integración con GitHub API (sin clonar)
-Análisis de dependencias (npm, pip, cargo)
-Machine Learning para detección avanzada
-Dashboard web en tiempo real
-🤝 Contribuir
+## 🤝 Contribuir
 
-Haz fork del repositorio
-Crea una rama (git checkout -b feature/nueva-funcionalidad)
-Haz commit de tus cambios (git commit -m 'Añadir nueva funcionalidad')
-Push a la rama (git push origin feature/nueva-funcionalidad)
-Abre un Pull Request
-📄 Licencia
+### Desarrollo del SAST Orchestrator
+```bash
+# 1. Clona y configura
+git clone https://github.com/alonsoir/test-driven-hardening.git
+cd test-driven-hardening/engine-prototype
+make init
 
-MIT License - Ver LICENSE para más detalles.
+# 2. Desarrolla nuevas funcionalidades
+# 3. Ejecuta pruebas
+make test
 
-🙏 Agradecimientos
+# 4. Envía PR
+```
 
-Test Driven Hardening - Filosofía de desarrollo
-University of Extremadura - Investigación académica
-GitHub - Por la API y repositorios públicos
-¿Preguntas o problemas? Abre un issue en GitHub o contacta a @alonsoir
+### Mejoras al GitHub Analyzer
+- El código está en `github_analyzer.py`
+- Usa issues para reportar bugs
+- PRs son bienvenidos para mejoras de compatibilidad
 
+## 📄 Licencia
 
+MIT License - Ver [LICENSE](LICENSE) para más detalles.
+
+## 🙏 Agradecimientos
+
+- **University of Extremadura** por la investigación académica
+- **Comunidad Open Source** por herramientas como semgrep, bandit, cppcheck
+- **GitHub** por la API y repositorios públicos
+- **Contribuidores** que hacen posible este proyecto
+
+---
+
+**¿Preguntas o problemas?** 
+- 📖 Consulta la [Wiki](https://github.com/alonsoir/test-driven-hardening/wiki)
+- 🐛 Reporta [Issues](https://github.com/alonsoir/test-driven-hardening/issues)
+- 💬 Únete a [Discussions](https://github.com/alonsoir/test-driven-hardening/discussions)
+
+**¿Te gusta el proyecto?** ⭐ Dale una estrella en GitHub para apoyar el desarrollo.
