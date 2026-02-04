@@ -1,0 +1,5 @@
+/Users/aironman/git/test-driven-hardening/engine-prototype/test_sast_example.py:6:32: error: The code contains unhandled character(s) (character code=195). Neither unicode nor extended ascii is supported. [unhandledChar]
+    # Vulnerabilidad de inyección de comandos
+                               ^
+nofile:0:0: information: Active checkers: There was critical errors (use --checkers-report=<filename> to see details) [checkersReport]
+
