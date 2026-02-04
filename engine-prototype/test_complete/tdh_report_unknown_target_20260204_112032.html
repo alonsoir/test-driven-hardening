@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TDH Security Report - .</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        .header { background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }
+        .stats { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+        .stat-box { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; flex: 1; min-width: 200px; }
+        .severity-critical { color: #dc3545; font-weight: bold; }
+        .severity-high { color: #fd7e14; font-weight: bold; }
+        .severity-medium { color: #ffc107; font-weight: bold; }
+        .severity-low { color: #28a745; font-weight: bold; }
+        .issues-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .issues-table th, .issues-table td { border: 1px solid #dee2e6; padding: 10px; text-align: left; }
+        .issues-table th { background: #f8f9fa; }
+        .badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; background: #6c757d; color: white; }
+        .badge-sast { background: #007bff; }
+        .badge-ast { background: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔍 TDH Security Analysis Report</h1>
+        <p><strong>Target:</strong> .</p>
+        <p><strong>Date:</strong> 2026-02-04 11:20:32</p>
+    </div>
+    
+    <div class="stats">
+        <div class="stat-box">
+            <h3>📊 Resumen</h3>
+            <p><strong>Total Issues:</strong> 141</p>
+            <p><strong>SAST Issues:</strong> 141</p>
+            <p><strong>AST Issues:</strong> 0</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>⚠️ SAST por Severidad</h3>
+            <p><span class="severity-low">LOW:</span> 55</p>
+            <p><span class="severity-medium">MEDIUM:</span> 11</p>
+            <p><span class="severity-high">HIGH:</span> 4</p>
+            <p><span class="severity-info">INFO:</span> 69</p>
+            <p><span class="severity-critical">CRITICAL:</span> 2</p>
+        </div>
+
+        <div class="stat-box">
+            <h3>🛠️ Herramientas Usadas</h3>
+            <p>bandit</p>
+            <p>cppcheck</p>
+            <p>flawfinder</p>
+        </div>
+    </div>
+    
+    <h2>🔧 Issues de SAST (141)</h2>
+    <table class="issues-table">
+        <thead>
+            <tr>
+                <th>Tool</th>
+                <th>Severity</th>
+                <th>File</th>
+                <th>Line</th>
+                <th>Message</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>tdh_unified.py</td>
+                <td>12</td>
+                <td>Consider possible security implications associated with the subprocess module....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>tdh_unified.py</td>
+                <td>221</td>
+                <td>Starting a process with a partial executable path...</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>tdh_unified.py</td>
+                <td>221</td>
+                <td>subprocess call - check for execution of untrusted input....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>tdh_unified.py</td>
+                <td>343</td>
+                <td>subprocess call - check for execution of untrusted input....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>github_analyzer.py</td>
+                <td>10</td>
+                <td>Consider possible security implications associated with the subprocess module....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>tdh_ignore.py</td>
+                <td>66</td>
+                <td>Try, Except, Pass detected....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>32</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>33</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>34</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>35</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>43</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>44</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>47</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>48</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>60</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>65</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>76</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>81</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>86</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>134</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>135</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>136</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>137</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_sast_integration.py</td>
+                <td>138</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-medium">MEDIUM</span></td>
+                <td>test_workspace.py</td>
+                <td>22</td>
+                <td>Probable insecure usage of temp file/directory....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>26</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>27</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-medium">MEDIUM</span></td>
+                <td>test_workspace.py</td>
+                <td>27</td>
+                <td>Probable insecure usage of temp file/directory....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>28</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>29</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>30</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>38</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>39</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>40</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>50</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>51</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>52</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>55</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>77</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>78</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>101</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>102</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>131</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>132</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>152</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>153</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>154</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>174</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>test_workspace.py</td>
+                <td>177</td>
+                <td>Use of assert detected. The enclosed code will be removed when compiling to optimised byte code....</td>
+            </tr>
+            <tr>
+                <td><span class="badge badge-sast">bandit</span></td>
+                <td><span class="severity-low">LOW</span></td>
+                <td>quick_test.py</td>
+                <td>14</td>
+                <td>Consider possible security implications associated with the subprocess module....</td>
+            </tr>
+        </tbody>
+    </table>
+    <p>... y 91 issues más (ver reporte JSON completo)</p>
+
+    <h2>🧬 Issues de AST (0)</h2>
+    <p>✅ No se encontraron issues de AST</p>
+
+    <hr>
+    <footer>
+        <p>Generated by TDH Engine v0.2.0 • 20260204_112032</p>
+    </footer>
+</body>
+</html>

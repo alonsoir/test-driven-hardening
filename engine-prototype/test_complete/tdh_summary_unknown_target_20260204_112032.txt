@@ -1,0 +1,33 @@
+============================================================
+TDH SECURITY ANALYSIS SUMMARY
+============================================================
+
+🔧 SAST ANALYSIS:
+  Total Issues: 141
+  By Severity:
+    CRITICAL: 2
+    HIGH: 4
+    MEDIUM: 11
+    LOW: 55
+    INFO: 69
+
+🧬 AST ANALYSIS:
+  Total Issues: 0
+
+⛔ CRITICAL/HIGH PRIORITY ISSUES:
+  1. [bandit] Starting a process with a shell, possible injection detected, security issue....
+     📍 /Users/aironman/git/test-driven-hardening/engine-prototype/scripts/test_vulnerable.py:19
+  2. [bandit] subprocess call with shell=True identified, security issue....
+     📍 /Users/aironman/git/test-driven-hardening/engine-prototype/scripts/test_vulnerable.py:41
+  3. [bandit] A Flask app appears to be run with debug=True, which exposes the Werkzeug debugg...
+     📍 /Users/aironman/git/test-driven-hardening/engine-prototype/scripts/test_vulnerable.py:45
+  4. [bandit] Use of weak MD5 hash for security. Consider usedforsecurity=False...
+     📍 /Users/aironman/git/test-driven-hardening/engine-prototype/scripts/test_vulnerable.py:56
+  5. [cppcheck] Buffer is accessed out of bounds: buf...
+     📍 /Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c:0
+  6. [cppcheck] Buffer is accessed out of bounds: buffer...
+     📍 /Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c:0
+
+============================================================
+✅ Analysis complete
+============================================================

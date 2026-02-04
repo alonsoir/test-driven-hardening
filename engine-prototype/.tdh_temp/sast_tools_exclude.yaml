@@ -1,0 +1,22 @@
+exclusions:
+  global:
+    directories:
+    - '**/venv/**'
+    - '**/.venv/**'
+    - '**/env/**'
+    - '**/.env/**'
+    - '**/__pycache__/**'
+    - '**/node_modules/**'
+    - '**/.git/**'
+    - '**/dist/**'
+    - '**/build/**'
+    - '**/target/**'
+    - '**/.tdh_temp/**'
+    files:
+    - '**/*.min.js'
+    - '**/*.min.css'
+    - '**/*.bundle.js'
+    - '**/*.log'
+global:
+  min_severity: CRITICAL
+  timeout_per_tool: 120

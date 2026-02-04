@@ -29,6 +29,7 @@ tools:
       confidence: ["--confidence-level", "MEDIUM"]
     file_extensions: [".py"]
     output_format: "json"
+    parser: "json"
     severity_mapping:
       HIGH: "CRITICAL"
       MEDIUM: "HIGH"
@@ -42,6 +43,7 @@ tools:
       scan_mode: ["--file"]
     file_extensions: [".py", "requirements.txt", "pyproject.toml", "setup.py"]
     output_format: "json"
+    parser: "json"
     severity_mapping:
       CRITICAL: "CRITICAL"
       HIGH: "HIGH"
@@ -55,25 +57,39 @@ tools:
       base: ["--disable=all", "--enable=security", "--output-format=json"]
     file_extensions: [".py"]
     output_format: "json"
+    parser: "json"
     severity_mapping:
       error: "HIGH"
       warning: "MEDIUM"
       convention: "LOW"
   
   # --- C/C++ Tools ---
-    cppcheck:
+  cppcheck:
     enabled: true
     command: "cppcheck"
     args:
-      base: ["--enable=all", "--output-file=-"]  # Usar salida estándar en lugar de archivo
+      base: 
+        - "--enable=warning,style,performance,portability"
+        - "--inconclusive"
+        - "--suppress=missingIncludeSystem"
+        - "--suppress=checkersReport"
+        - "--suppress=missingInclude"
+        - "--xml"
+        - "--xml-version=2"
+      # Opciones adicionales para mayor precisión
+      advanced:
+        - "--std=c++11"
+        - "--platform=unix64"
     file_extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"]
-    output_format: "text"
+    output_format: "xml"
+    parser: "xml_stdout"
     severity_mapping:
       error: "CRITICAL"
       warning: "HIGH"
       style: "MEDIUM"
       performance: "LOW"
-      information: "INFO"
+      portability: "LOW"
+      information: "INFO"  # Estos se filtrarán si no son relevantes
   
   flawfinder:
     enabled: true
@@ -83,6 +99,7 @@ tools:
       min_level: ["--minlevel=3"]
     file_extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"]
     output_format: "text"
+    parser: "json"
     severity_mapping:
       "5": "CRITICAL"
       "4": "HIGH"
@@ -97,6 +114,7 @@ tools:
       base: ["-checks=security-*,bugprone-*,cert-*", "--format=json"]
     file_extensions: [".c", ".cpp", ".cc", ".cxx", ".h", ".hpp"]
     output_format: "json"
+    parser: "json"
     requires_compilation_db: true
   
   # --- Multi-language Tools ---
@@ -119,6 +137,7 @@ tools:
       - ".php"
       - ".cs"
     output_format: "json"
+    parser: "json"
     severity_mapping:
       ERROR: "CRITICAL"
       WARNING: "HIGH"
@@ -138,6 +157,7 @@ tools:
       output: ["-xml:withMessages"]
     file_extensions: [".java", ".class", ".jar"]
     output_format: "xml"
+    parser: "xml"
     severity_mapping:
       HIGH: "CRITICAL"
       MEDIUM: "HIGH"
@@ -150,6 +170,7 @@ tools:
       base: ["-c", "/google_checks.xml", "-f", "xml"]
     file_extensions: [".java"]
     output_format: "xml"
+    parser: "xml"
   
   # --- JavaScript/TypeScript Tools ---
   eslint_security:
@@ -160,6 +181,7 @@ tools:
       config: ["--config", "security.js"]
     file_extensions: [".js", ".jsx", ".ts", ".tsx"]
     output_format: "json"
+    parser: "json"
     requires_config_file: true
   
   # --- Go Tools ---
@@ -170,6 +192,7 @@ tools:
       base: ["-fmt=json", "-quiet"]
     file_extensions: [".go"]
     output_format: "json"
+    parser: "json"
   
   # --- Ruby Tools ---
   brakeman:
@@ -179,6 +202,7 @@ tools:
       base: ["-f", "json"]
     file_extensions: [".rb", ".erb"]
     output_format: "json"
+    parser: "json"
 
 # Language-specific tool chains
 language_toolchains:
@@ -221,6 +245,10 @@ exclusions:
       - "**/target/**"
       - "**/.idea/**"
       - "**/.vscode/**"
+      - "**/venv/**"           
+      - "**/.venv/**"          
+      - "**/env/**"            
+      - "**/.env/**"           
     
     files:
       - "**/*.min.js"
@@ -235,6 +263,7 @@ exclusions:
     cppcheck:
       - "**/test_*.cpp"
       - "**/*_test.cpp"
+      - "**/vendor/**"
     
     bandit:
       - "**/test_*.py"
