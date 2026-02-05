@@ -1,0 +1,21 @@
+============================================================
+TDH SECURITY ANALYSIS SUMMARY (FILTERED)
+============================================================
+Showing only CRITICAL/HIGH severity issues with noise filtered
+
+🔧 SAST ANALYSIS:
+  Total Issues: 1
+  By Severity:
+    CRITICAL: 1
+
+⛔ CRITICAL/HIGH PRIORITY ISSUES:
+   1. [cppcheck  ] There is an unknown macro here somewhere. Configuration is r...
+      📍 ...test-zeromq-c-/sniffer/src/kernel/sniffer.bpf.c:0
+
+🧬 AST ANALYSIS:
+  Total Issues: 0
+  (AST analysis not run or no issues found)
+
+============================================================
+✅ Filtered analysis complete
+============================================================

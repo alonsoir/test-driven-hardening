@@ -1,0 +1,1012 @@
+{
+  "metadata": {
+    "project": "/Users/aironman/git/test-driven-hardening/engine-prototype",
+    "scan_id": "20260205_091251",
+    "start_time": "2026-02-05T09:10:35.512234",
+    "end_time": "2026-02-05T09:12:51.183555",
+    "duration_seconds": 135.671321,
+    "tdh_version": "0.1.0"
+  },
+  "statistics": {
+    "total_files": 16,
+    "total_issues": 108,
+    "issues_by_severity": {
+      "LOW": 49,
+      "MEDIUM": 2,
+      "CRITICAL": 2,
+      "INFO": 55
+    },
+    "issues_by_tool": {
+      "bandit": 51,
+      "cppcheck": 2,
+      "flawfinder": 55
+    },
+    "start_time": "2026-02-05 09:10:35.512234",
+    "end_time": "2026-02-05 09:12:51.183555"
+  },
+  "issues": [
+    {
+      "tool": "bandit",
+      "rule_id": "B404",
+      "severity": "LOW",
+      "message": "Consider possible security implications associated with the subprocess module.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tdh_unified.py",
+      "line": 12,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "timestamp": "2026-02-05T09:10:37.302516"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B607",
+      "severity": "LOW",
+      "message": "Starting a process with a partial executable path",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tdh_unified.py",
+      "line": 248,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b607_start_process_with_partial_path.html",
+      "timestamp": "2026-02-05T09:10:37.302558"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B603",
+      "severity": "LOW",
+      "message": "subprocess call - check for execution of untrusted input.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tdh_unified.py",
+      "line": 248,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b603_subprocess_without_shell_equals_true.html",
+      "timestamp": "2026-02-05T09:10:37.302561"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B603",
+      "severity": "LOW",
+      "message": "subprocess call - check for execution of untrusted input.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tdh_unified.py",
+      "line": 464,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b603_subprocess_without_shell_equals_true.html",
+      "timestamp": "2026-02-05T09:10:37.302565"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B404",
+      "severity": "LOW",
+      "message": "Consider possible security implications associated with the subprocess module.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/github_analyzer.py",
+      "line": 10,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "timestamp": "2026-02-05T09:10:46.477672"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B110",
+      "severity": "LOW",
+      "message": "Try, Except, Pass detected.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tdh_ignore.py",
+      "line": 66,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b110_try_except_pass.html",
+      "timestamp": "2026-02-05T09:10:55.741646"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 32,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.108956"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 33,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109001"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 34,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109004"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 35,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109008"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 43,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109011"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 44,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109014"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 47,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109016"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 48,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109019"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 60,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109021"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 65,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109024"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 76,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109028"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 81,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109030"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 86,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109032"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 134,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109035"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 135,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109037"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 136,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109039"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 137,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109041"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_sast_integration.py",
+      "line": 138,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:22.109044"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B108",
+      "severity": "MEDIUM",
+      "message": "Probable insecure usage of temp file/directory.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 22,
+      "confidence": "MEDIUM",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b108_hardcoded_tmp_directory.html",
+      "timestamp": "2026-02-05T09:11:39.473872"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 26,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473913"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 27,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473917"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B108",
+      "severity": "MEDIUM",
+      "message": "Probable insecure usage of temp file/directory.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 27,
+      "confidence": "MEDIUM",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b108_hardcoded_tmp_directory.html",
+      "timestamp": "2026-02-05T09:11:39.473920"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 28,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473923"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 29,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473925"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 30,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473927"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 38,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473930"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 39,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473935"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 40,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473938"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 50,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473940"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 51,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473943"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 52,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473945"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 55,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473947"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 77,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473950"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 78,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473952"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 101,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473954"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 102,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473957"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 131,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473959"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 132,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473962"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 152,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473964"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 153,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473966"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 154,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473969"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 174,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473971"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B101",
+      "severity": "LOW",
+      "message": "Use of assert detected. The enclosed code will be removed when compiling to optimised byte code.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/tests/test_workspace.py",
+      "line": 177,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b101_assert_used.html",
+      "timestamp": "2026-02-05T09:11:39.473973"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B404",
+      "severity": "LOW",
+      "message": "Consider possible security implications associated with the subprocess module.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/scripts/quick_test.py",
+      "line": 14,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/blacklists/blacklist_imports.html#b404-import-subprocess",
+      "timestamp": "2026-02-05T09:12:06.882335"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B603",
+      "severity": "LOW",
+      "message": "subprocess call - check for execution of untrusted input.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/scripts/quick_test.py",
+      "line": 15,
+      "confidence": "HIGH",
+      "more_info": "https://bandit.readthedocs.io/en/1.9.3/plugins/b603_subprocess_without_shell_equals_true.html",
+      "timestamp": "2026-02-05T09:12:06.882373"
+    },
+    {
+      "tool": "cppcheck",
+      "rule_id": "bufferAccessOutOfBounds",
+      "severity": "CRITICAL",
+      "message": "Buffer is accessed out of bounds: buf",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "line": 0,
+      "column": 0,
+      "timestamp": "2026-02-05T09:12:15.662846"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c:4:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456617"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456656"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456659"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456662"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456664"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c:5:  [2] (buffer) strcpy:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456666"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Does not check for buffer overflows when copying to destination [MS-banned]",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456668"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "(CWE-120). Consider using snprintf, strcpy_s, or strlcpy (warning: strncpy",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456670"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "easily misused). Risk is low because the source is a constant string.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_vuln.c",
+      "timestamp": "2026-02-05T09:12:22.456675"
+    },
+    {
+      "tool": "cppcheck",
+      "rule_id": "bufferAccessOutOfBounds",
+      "severity": "CRITICAL",
+      "message": "Buffer is accessed out of bounds: buffer",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "line": 0,
+      "column": 0,
+      "timestamp": "2026-02-05T09:12:22.480033"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c:6:  [4] (buffer) strcpy:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593753"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Does not check for buffer overflows when copying to destination [MS-banned]",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593793"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "(CWE-120). Consider using snprintf, strcpy_s, or strlcpy (warning: strncpy",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593796"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "easily misused).",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593798"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c:5:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593800"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593802"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593804"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593806"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_c_vulnerable.c",
+      "timestamp": "2026-02-05T09:12:29.593812"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c:7:  [4] (buffer) strcpy:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673489"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Does not check for buffer overflows when copying to destination [MS-banned]",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673532"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "(CWE-120). Consider using snprintf, strcpy_s, or strlcpy (warning: strncpy",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673535"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "easily misused).",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673537"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c:5:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673539"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673544"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673546"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673548"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673552"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c:6:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673554"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673556"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673558"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673560"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_buffer_overflow.c",
+      "timestamp": "2026-02-05T09:12:36.673562"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c:9:  [4] (buffer) strcpy:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958618"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Does not check for buffer overflows when copying to destination [MS-banned]",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958657"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "(CWE-120). Consider using snprintf, strcpy_s, or strlcpy (warning: strncpy",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958659"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "easily misused).",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958662"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c:5:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958664"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958666"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958668"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958670"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958672"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c:6:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958675"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958677"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958679"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958682"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/test_cpp.c",
+      "timestamp": "2026-02-05T09:12:43.958684"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c:7:  [4] (buffer) strcpy:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183457"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Does not check for buffer overflows when copying to destination [MS-banned]",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183498"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "(CWE-120). Consider using snprintf, strcpy_s, or strlcpy (warning: strncpy",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183500"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "easily misused).",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183503"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c:6:  [2] (buffer) char:",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183505"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "Statically-sized arrays can be improperly restricted, leading to potential",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183507"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "overflows or other issues (CWE-119!/CWE-120). Perform bounds checking, use",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183509"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "functions that limit length, or ensure that the size is larger than the",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183511"
+    },
+    {
+      "tool": "flawfinder",
+      "severity": "INFO",
+      "message": "maximum possible length.",
+      "file": "/Users/aironman/git/test-driven-hardening/engine-prototype/knowledge_base/CWE-120/example1.c",
+      "timestamp": "2026-02-05T09:12:51.183513"
+    }
+  ],
+  "configuration": {
+    "tools_used": [
+      "bandit",
+      "safety",
+      "cppcheck",
+      "flawfinder",
+      "semgrep",
+      "eslint_security"
+    ],
+    "sast_config": {
+      "min_severity": "CRITICAL",
+      "timeout_per_tool": 60,
+      "max_issues_per_file": 50,
+      "parallel_execution": true,
+      "max_parallel_jobs": 4
+    }
+  }
+}

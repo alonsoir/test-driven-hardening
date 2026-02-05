@@ -1,0 +1,23 @@
+============================================================
+TDH SECURITY ANALYSIS SUMMARY (FILTERED)
+============================================================
+Showing only CRITICAL/HIGH severity issues with noise filtered
+
+🔧 SAST ANALYSIS:
+  Total Issues: 2
+  By Severity:
+    CRITICAL: 2
+
+⛔ CRITICAL/HIGH PRIORITY ISSUES:
+   1. [cppcheck  ] Buffer is accessed out of bounds: buf...
+      📍 ...t-driven-hardening/engine-prototype/test_vuln.c:0
+   2. [cppcheck  ] Buffer is accessed out of bounds: buffer...
+      📍 ...-hardening/engine-prototype/test_c_vulnerable.c:0
+
+🧬 AST ANALYSIS:
+  Total Issues: 0
+  (AST analysis not run or no issues found)
+
+============================================================
+✅ Filtered analysis complete
+============================================================

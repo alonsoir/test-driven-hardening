@@ -842,26 +842,67 @@ class SASTOrchestrator:
         
         rule_id = issue.get('rule_id', '').lower()
         message = issue.get('message', '').lower()
+        filepath = issue.get('file', '').lower()
         
-        # Lista de issues de cppcheck que normalmente son falsos positivos o no útiles
-        cppcheck_noise = [
-            'checkersreport',
-            'missingincludesystem',
-            'missinginclude',
-            'unusedfunction',
-            'unreadvariable',
-            'unusedvariable',
-            'variablehidesvariable',
-            'functionstatic',
-            'funcioneshouldbestatic',
-            'stylistic'
-        ]
+        # 1. Excluir archivos generados por protobuf
+        protobuf_patterns = ['.pb.cc', '.pb.h', '_generated', '_pb2']
+        if any(pattern in filepath for pattern in protobuf_patterns):
+            print(f"    [FILTER] Excluyendo archivo protobuf: {filepath}")
+            return False
         
-        for noise in cppcheck_noise:
-            if noise in rule_id or noise in message:
+        # 2. Ignorar 'invalid C code' en archivos C++ válidos
+        if 'invalid c code' in message:
+            # Obtener extensión del archivo
+            import os
+            ext = os.path.splitext(filepath)[1]
+            cpp_extensions = ['.cc', '.cpp', '.cxx', '.hpp', '.hxx']
+            
+            if ext in cpp_extensions:
+                print(f"    [FILTER] Ignorando 'invalid C code' en archivo C++: {filepath}")
+                return False
+            
+            # También si el mensaje contiene palabras clave de C++
+            cpp_keywords = ['namespace', 'class', 'template', 'public:', 'private:', 'protected:']
+            if any(keyword in message for keyword in cpp_keywords):
+                print(f"    [FILTER] Ignorando código C++ válido: {message[:100]}")
                 return False
         
-        # Mantener solo issues de seguridad reales
+        # 3. Excluir errores de versión de protoc
+        if '#error this file was generated' in message:
+            print(f"    [FILTER] Excluyendo error de versión de protoc: {message[:100]}")
+            return False
+        
+        # 4. Excluir missing includes en archivos generados
+        if 'missingincludesystem' in rule_id:
+            if any(pattern in filepath for pattern in protobuf_patterns):
+                print(f"    [FILTER] Excluyendo missing include en archivo generado: {filepath}")
+                return False
+        # Añadir esto después del punto 4 en _filter_cppcheck_issue
+        # (justo antes de "Mantener solo issues de seguridad reales")
+
+        # 5. Filtrar "unknown macro" warnings en archivos BPF
+        if 'unknown macro' in message:
+            # Verificar si es archivo BPF/eBPF
+            if filepath.endswith('.bpf.c') or '.bpf.' in filepath:
+                print(f"    [FILTER] Excluyendo unknown macro warning en archivo BPF: {filepath}")
+                return False
+    
+            # También si menciona la macro SEC (común en eBPF)
+            if 'sec' in message.lower():
+                print(f"    [FILTER] Excluyendo advertencia de macro SEC (eBPF): {message[:100]}")
+                return False
+
+        # 6. Filtrar issues "unknownMacro" que no son de seguridad
+        if rule_id == 'unknownmacro' and severity in ['CRITICAL', 'HIGH']:
+            # Verificar si tiene keywords de seguridad
+            security_keywords = ['buffer', 'overflow', 'injection', 'vulnerability', 'security']
+            has_security_context = any(keyword in message for keyword in security_keywords)
+    
+            if not has_security_context:
+                print(f"    [FILTER] Excluyendo unknownMacro sin contexto de seguridad: {message[:100]}")
+                return False
+
+        # 7. Mantener solo issues de seguridad reales (ajustado para C/C++)
         security_keywords = [
             'buffer',
             'overflow',
@@ -877,16 +918,19 @@ class SASTOrchestrator:
             'null pointer',
             'dereference',
             'insecure',
-            'vulnerability'
+            'vulnerability',
+            'security',
+            'dangerous',
+            'unsafe'
         ]
         
         # Si el issue NO tiene palabras clave de seguridad, puede ser ruido
         has_security_keyword = any(keyword in message for keyword in security_keywords)
         
-        # Si es INFO y no tiene keywords de seguridad, excluirlo
+        # Si es de severidad baja (INFO) y no tiene keywords de seguridad, excluirlo
         if issue.get('severity') == 'INFO' and not has_security_keyword:
             return False
-        
+    
         return True
 
     def _filter_bandit_issue(self, issue: Dict[str, Any]) -> bool:

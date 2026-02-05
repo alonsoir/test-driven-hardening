@@ -1,0 +1,56 @@
+# config/llm_council.yaml
+llms:
+  - name: "Claude-3.5-Sonnet"
+    model: "anthropic/claude-3.5-sonnet"
+    api_key_env: "OPENROUTER_API_KEY"
+    priority: 1
+    
+  - name: "GPT-4-Turbo"
+    model: "openai/gpt-4-turbo"
+    api_key_env: "OPENROUTER_API_KEY"
+    priority: 2
+    
+  - name: "DeepSeek-Coder"
+    model: "deepseek/deepseek-coder"
+    api_key_env: "OPENROUTER_API_KEY"
+    priority: 3
+    
+  - name: "Gemini-Pro"
+    model: "google/gemini-pro"
+    api_key_env: "OPENROUTER_API_KEY"
+    priority: 4
+    
+  - name: "Llama-3.1-70B"
+    model: "meta-llama/llama-3.1-70b-instruct"
+    api_key_env: "OPENROUTER_API_KEY"
+    priority: 5
+    
+  - name: "CodeLlama-70B"
+    model: "meta-llama/codellama-70b-instruct"
+    api_key_env: "OPENROUTER_API_KEY"
+    priority: 6
+
+settings:
+  min_llms: 3
+  preferred_odd_number: 5
+  timeout_per_llm: 120
+  max_retries: 2
+  
+  language_preferences:
+    c_cpp:
+      - "Claude-3.5-Sonnet"
+      - "DeepSeek-Coder"
+      - "GPT-4-Turbo"
+    python:
+      - "Claude-3.5-Sonnet"
+      - "GPT-4-Turbo"
+      - "Gemini-Pro"
+    javascript:
+      - "Claude-3.5-Sonnet"
+      - "GPT-4-Turbo"
+      - "Llama-3.1-70B"
+
+  voting:
+    enabled: true
+    method: "majority"
+    fallback: "first_successful"
