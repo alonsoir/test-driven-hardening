@@ -1,56 +1,79 @@
-# config/llm_council.yaml
-llms:
-  - name: "Claude-3.5-Sonnet"
-    model: "anthropic/claude-3.5-sonnet"
-    api_key_env: "OPENROUTER_API_KEY"
+# config/llm_council.yaml (actualizado)
+llm_configs:
+  # Modelos SOTA para el consejo
+  claude-3-5-sonnet:
+    provider: openrouter
+    model: claude-3.5-sonnet
+    max_tokens: 4000
+    temperature: 0.1
     priority: 1
     
-  - name: "GPT-4-Turbo"
-    model: "openai/gpt-4-turbo"
-    api_key_env: "OPENROUTER_API_KEY"
+  gpt-4-turbo:
+    provider: openrouter  
+    model: gpt-4-turbo
+    max_tokens: 4000
+    temperature: 0.1
     priority: 2
     
-  - name: "DeepSeek-Coder"
-    model: "deepseek/deepseek-coder"
-    api_key_env: "OPENROUTER_API_KEY"
+  deepseek-coder:
+    provider: openrouter
+    model: deepseek-coder
+    max_tokens: 4000
+    temperature: 0.1
     priority: 3
     
-  - name: "Gemini-Pro"
-    model: "google/gemini-pro"
-    api_key_env: "OPENROUTER_API_KEY"
+  gemini-pro:
+    provider: openrouter
+    model: gemini-pro
+    max_tokens: 4000
+    temperature: 0.1
     priority: 4
     
-  - name: "Llama-3.1-70B"
-    model: "meta-llama/llama-3.1-70b-instruct"
-    api_key_env: "OPENROUTER_API_KEY"
+  llama-3-1-70b:
+    provider: openrouter
+    model: llama-3.1-70b
+    max_tokens: 4000
+    temperature: 0.1
     priority: 5
     
-  - name: "CodeLlama-70B"
-    model: "meta-llama/codellama-70b-instruct"
-    api_key_env: "OPENROUTER_API_KEY"
+  codellama-70b:
+    provider: openrouter
+    model: codellama-70b
+    max_tokens: 4000
+    temperature: 0.1
     priority: 6
 
-settings:
+# Configuración del consejo
+council_settings:
   min_llms: 3
-  preferred_odd_number: 5
-  timeout_per_llm: 120
-  max_retries: 2
+  max_llms: 5
+  preferred_count: 3  # Impar para votación
+  timeout_seconds: 300
+  enable_discussion: true
   
-  language_preferences:
-    c_cpp:
-      - "Claude-3.5-Sonnet"
-      - "DeepSeek-Coder"
-      - "GPT-4-Turbo"
-    python:
-      - "Claude-3.5-Sonnet"
-      - "GPT-4-Turbo"
-      - "Gemini-Pro"
-    javascript:
-      - "Claude-3.5-Sonnet"
-      - "GPT-4-Turbo"
-      - "Llama-3.1-70B"
-
-  voting:
-    enabled: true
-    method: "majority"
-    fallback: "first_successful"
+# Configuración de máquinas de estados
+state_machine_settings:
+  max_analysis_time: 60
+  max_test_design_time: 45
+  max_fix_design_time: 90
+  max_documentation_time: 30
+  enable_state_persistence: true
+  state_checkpoint_dir: "./tdh_states"
+  
+# Prompts personalizados por estado
+state_prompts:
+  analyzing:
+    system: "Eres un experto en seguridad de código. Analiza esta vulnerabilidad detalladamente."
+    temperature: 0.1
+    
+  test_designing:
+    system: "Eres un ingeniero de pruebas de seguridad. Diseña tests que demuestren vulnerabilidades."
+    temperature: 0.2
+    
+  fix_designing:
+    system: "Eres un ingeniero de seguridad que escribe código seguro y mantiene funcionalidad."
+    temperature: 0.1
+    
+  documenting:
+    system: "Eres un documentador técnico especializado en seguridad de código."
+    temperature: 0.1

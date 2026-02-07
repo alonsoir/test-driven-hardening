@@ -1,1169 +1,754 @@
 #!/usr/bin/env python3
 """
-TDH Unified Analyzer - Punto de entrada unificado para análisis de seguridad
-Combina análisis AST (github_analyzer.py) y SAST (SASTOrchestrator) + Consejo de LLMs
+TDH Engine - Test-Driven Hardening Engine
+CLI principal con comandos para SAST, consejo de LLMs y máquinas de estados.
 """
 
-import os
-import sys
-import json
-import click
-import tempfile
-import subprocess
-import shutil
 import asyncio
+import sys
+import argparse
+import json
+import yaml
 from pathlib import Path
 from datetime import datetime
-from urllib.parse import urlparse
+from typing import Dict, Any, Optional, List
+import os
 
-# Añadir src al path
-sys.path.append(str(Path(__file__).parent / 'src'))
-
+# Importaciones internas
 try:
-    from core.sast_orchestrator import SASTOrchestrator
-    from core.git_worktree_manager import GitWorktreeManager
-    from core.llm_council import LLMCouncil
-    from llms.openrouter_adapter import OpenRouterLLM
+    from src.core.sast_orchestrator import SASTOrchestrator
+    from src.core.git_worktree_manager import GitWorktreeManager
+    from src.core.llm_council import LLMCouncil
+    from src.core.llm_council_enhanced import EnhancedLLMCouncil
+    from src.core.llm_state_machine import LLMStateMachine, LLMState
+    from src.adapters.openrouter_adapter import OpenRouterAdapter
+    print("✅ Módulos principales cargados")
 except ImportError as e:
-    print(f"❌ Error de importación: {e}")
-    print("🔧 Asegúrate de que la estructura del proyecto es correcta")
-    sys.exit(1)
-
-# Serializador JSON personalizado para manejar tipos no estándar
-class TDHJSONEncoder(json.JSONEncoder):
-    """Encoder personalizado para serializar objetos datetime y otros tipos especiales"""
-    def default(self, obj):
-        if isinstance(obj, datetime):
-            return obj.isoformat()
-        elif isinstance(obj, Path):
-            return str(obj)
-        elif hasattr(obj, '__dict__'):
-            return obj.__dict__
-        return super().default(obj)
-
-@click.group()
-def cli():
-    """TDH Unified Analyzer - Herramienta unificada de análisis de seguridad"""
-    pass
-
-@cli.command()
-@click.argument('target', required=True)
-@click.option('--sast', is_flag=True, help='Ejecutar análisis SAST')
-@click.option('--ast', is_flag=True, help='Ejecutar análisis AST (github_analyzer.py)')
-@click.option('--all', is_flag=True, help='Ejecutar todos los análisis')
-@click.option('--output-dir', default='reports', help='Directorio de salida para reportes')
-@click.option('--format', default='json', type=click.Choice(['json', 'html', 'both']), 
-              help='Formato del reporte')
-@click.option('--severity', default='MEDIUM', 
-              type=click.Choice(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']),
-              help='Severidad mínima a reportar')
-@click.option('--critical-only', is_flag=True, help='Mostrar solo issues CRITICAL')
-@click.option('--no-info', is_flag=True, default=True, help='Excluir issues INFO (por defecto: True)')
-@click.option('--filter-noise', is_flag=True, default=True, help='Filtrar ruido común (por defecto: True)')
-@click.option('--max-issues', default=100, type=int, help='Máximo número de issues a mostrar')
-@click.option('--no-cleanup', is_flag=True, help='No eliminar directorios temporales')
-@click.option('--exclude-venv', is_flag=True, default=True, help='Excluir entorno virtual del análisis')
-def analyze(target, sast, ast, all, output_dir, format, severity, critical_only, 
-            no_info, filter_noise, max_issues, no_cleanup, exclude_venv):    
-    """
-    Analiza un repositorio o directorio local
+    print(f"⚠️  Algunos módulos no pudieron cargarse: {e}")
+    print("⚠️  Algunas funcionalidades pueden estar limitadas")
     
-    TARGET puede ser:
-      - URL de GitHub: alonsoir/test-zeromq-c-
-      - Ruta local: ./mi_proyecto
-      - URL completa: https://github.com/alonsoir/test-zeromq-c-
-    """
-    print("=" * 60)
-    print("🔍 TDH Unified Analyzer v0.3.0 - Filtrado Avanzado + LLM Council")
-    print("=" * 60)
-    
-    # Determinar qué análisis ejecutar
-    if all:
-        sast = True
-        ast = True
-    
-    if not sast and not ast:
-        click.echo("⚠️  Debes especificar al menos un tipo de análisis (--sast, --ast, o --all)")
-        click.echo("💡 Usa --help para ver todas las opciones")
-        return
-    
-    # Ajustar filtros basados en opciones
-    if critical_only:
-        severity = 'CRITICAL'
-        print("🔴 Modo CRITICAL-ONLY: Solo se mostrarán issues CRITICAL")
-    
-    if no_info and severity != 'INFO':
-        print("📊 Excluyendo issues INFO (--no-info activado)")
-    
-    if filter_noise:
-        print("🧹 Filtrando ruido común (missing includes, checkers report, etc.)")
-    
-    print(f"📏 Máximo issues a mostrar: {max_issues}")
-    
-    # Procesar target
-    target_type, target_path = _process_target(target, no_cleanup)
-    
-    if not target_path:
-        click.echo(f"❌ No se pudo procesar el target: {target}")
-        return
-    
-    print(f"📦 Target: {target}")
-    print(f"📁 Tipo: {target_type}")
-    print(f"📍 Ruta: {target_path}")
-    print(f"⚙️  Análisis: AST={ast}, SAST={sast}")
-    print(f"📊 Severidad mínima: {severity}")
-    print(f"📁 Salida: {output_dir}")
-    print(f"🚫 Excluir venv: {exclude_venv}")
-    
-    resultados = {}
-    
-    # Ejecutar análisis SAST
-    if sast:
-        print("\n" + "-" * 40)
-        print("🔧 EJECUTANDO ANÁLISIS SAST")
-        print("-" * 40)
+    # Mock classes para permitir que el CLI funcione
+    class SASTOrchestrator:
+        def __init__(self, config_path=None):
+            pass
         
-        try:
-            # Configurar SAST con severidad personalizada
-            sast_results = _run_sast_analysis(target_path, severity, exclude_venv, 
-                                            no_info, filter_noise, max_issues)
-            
-            # Serializar resultados SAST para JSON
-            sast_results_serializable = _serialize_for_json(sast_results)
-            resultados['sast'] = sast_results_serializable
-            
-            if 'issues' in sast_results:
-                print(f"✅ SAST completado: {len(sast_results.get('issues', []))} issues encontrados")
-            else:
-                print(f"⚠️  SAST completado pero sin resultados de issues")
-        except Exception as e:
-            print(f"❌ Error en análisis SAST: {e}")
-            import traceback
-            traceback.print_exc()
-            resultados['sast'] = {'error': str(e)}
+        async def analyze_repository(self, repo_path, output_dir=None):
+            return {"issues": [], "summary": {"total": 0}}
     
-    # Ejecutar análisis AST
-    if ast:
-        print("\n" + "-" * 40)
-        print("🧬 EJECUTANDO ANÁLISIS AST")
-        print("-" * 40)
+    class GitWorktreeManager:
+        def __init__(self, base_worktree_dir, github_token=None):
+            self.base_worktree_dir = base_worktree_dir
+            
+        async def initialize(self, repo_url):
+            pass
         
-        try:
-            ast_results = _run_ast_analysis(target_path, output_dir)
-            # Serializar resultados AST para JSON
-            ast_results_serializable = _serialize_for_json(ast_results)
-            resultados['ast'] = ast_results_serializable
-            
-            if ast_results.get('success'):
-                print(f"✅ AST completado: Reporte generado en {ast_results.get('report_path', 'N/A')}")
-            else:
-                print(f"⚠️  AST falló: {ast_results.get('error', 'Error desconocido')}")
-        except Exception as e:
-            print(f"❌ Error en análisis AST: {e}")
-            import traceback
-            traceback.print_exc()
-            resultados['ast'] = {'error': str(e)}
+        def is_initialized(self):
+            return False
     
-    # Generar reporte combinado
-    print("\n" + "-" * 40)
-    print("📊 GENERANDO REPORTES COMBINADOS")
-    print("-" * 40)
+    class LLMCouncil:
+        def __init__(self, config_path=None):
+            pass
+        
+        async def initialize_council(self):
+            return []
     
-    reportes_generados = _generate_combined_reports(
-        resultados, 
-        target, 
-        output_dir, 
-        format
-    )
-    
-    # Mostrar resumen
-    _print_summary(resultados, reportes_generados)
-    
-    # Limpieza (si se solicita)
-    if not no_cleanup and target_type == 'github':
-        try:
-            # Verificar que es un directorio temporal (contiene 'tmp' en la ruta)
-            if 'tmp' in target_path or 'temp' in target_path:
-                shutil.rmtree(target_path, ignore_errors=True)
-                print(f"🧹 Directorio temporal eliminado: {target_path}")
-            else:
-                print(f"⚠️  No se elimina directorio (no parece temporal): {target_path}")
-        except Exception as e:
-            print(f"⚠️  No se pudo eliminar directorio: {e}")
+    class EnhancedLLMCouncil:
+        def __init__(self, config_path=None):
+            pass
+        
+        async def initialize_with_state_machines(self, worktree_manager):
+            return {}
 
-def _serialize_for_json(obj):
-    """Convierte objetos no serializables (datetime, Path) a strings para JSON"""
-    if isinstance(obj, dict):
-        return {k: _serialize_for_json(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [_serialize_for_json(item) for item in obj]
-    elif isinstance(obj, datetime):
-        return obj.isoformat()
-    elif isinstance(obj, Path):
-        return str(obj)
-    elif hasattr(obj, '__dict__'):
-        # Para objetos con atributos, convertimos a dict
-        return _serialize_for_json(obj.__dict__)
-    else:
-        return obj
 
-def _process_target(target, no_cleanup):
-    """
-    Procesa el target: determina si es URL de GitHub o ruta local
-    Retorna: (tipo, ruta_local)
-    """
-    # Si ya es una ruta local
-    if os.path.exists(target):
-        return 'local', os.path.abspath(target)
+def load_config(config_name: str) -> Dict[str, Any]:
+    """Carga archivos de configuración YAML."""
+    config_dir = Path("config")
+    config_file = config_dir / f"{config_name}.yaml"
     
-    # Si es una URL de GitHub
-    github_url = None
-    if target.startswith('https://github.com/') or target.startswith('http://github.com/'):
-        github_url = target
-        if not github_url.endswith('.git'):
-            github_url += '.git'
-    elif '/' in target and ' ' not in target and not os.path.exists(target):
-        # Formato usuario/repo o usuario/repo-
-        if target.endswith('.git'):
-            target = target[:-4]
-        github_url = f"https://github.com/{target}.git"
+    if not config_file.exists():
+        # Crear configuración por defecto si no existe
+        if config_name == "sast_tools":
+            default_config = {
+                "tools": {
+                    "cppcheck": {"enabled": True, "args": "--enable=all"},
+                    "bandit": {"enabled": True, "args": "-r . -f json"},
+                    "semgrep": {"enabled": True, "args": "--config=auto"},
+                    "flawfinder": {"enabled": True, "args": "--quiet"},
+                    "safety": {"enabled": True, "args": "check"}
+                }
+            }
+            config_dir.mkdir(exist_ok=True)
+            with open(config_file, 'w') as f:
+                yaml.dump(default_config, f)
+            return default_config
+        elif config_name == "llm_council":
+            default_config = {
+                "llm_configs": {
+                    "claude-3-5-sonnet": {
+                        "provider": "openrouter",
+                        "model": "claude-3.5-sonnet",
+                        "max_tokens": 4000,
+                        "temperature": 0.1,
+                        "priority": 1
+                    },
+                    "gpt-4-turbo": {
+                        "provider": "openrouter",
+                        "model": "gpt-4-turbo",
+                        "max_tokens": 4000,
+                        "temperature": 0.1,
+                        "priority": 2
+                    },
+                    "deepseek-coder": {
+                        "provider": "openrouter",
+                        "model": "deepseek-coder",
+                        "max_tokens": 4000,
+                        "temperature": 0.1,
+                        "priority": 3
+                    }
+                },
+                "council_settings": {
+                    "min_llms": 3,
+                    "max_llms": 5,
+                    "preferred_count": 3,
+                    "timeout_seconds": 300
+                }
+            }
+            config_dir.mkdir(exist_ok=True)
+            with open(config_file, 'w') as f:
+                yaml.dump(default_config, f)
+            return default_config
+        else:
+            return {}
     
-    if github_url:
-        # Clonar el repositorio
-        try:
-            # Extraer nombre del repo de la URL
-            if github_url.endswith('.git'):
-                repo_name = github_url.split('/')[-1][:-4]  # Quitar .git
-            else:
-                repo_name = github_url.split('/')[-1]
-            
-            if no_cleanup:
-                # Usar directorio fijo
-                clone_dir = Path.cwd() / 'cloned_repos' / repo_name
-                clone_dir.mkdir(parents=True, exist_ok=True)
-            else:
-                # Usar directorio temporal
-                temp_dir = tempfile.mkdtemp(prefix=f"tdh_clone_{repo_name}_")
-                clone_dir = Path(temp_dir) / repo_name
-            
-            print(f"📥 Clonando repositorio: {github_url}")
-            result = subprocess.run(
-                ['git', 'clone', '--depth', '1', github_url, str(clone_dir)],
-                capture_output=True,
-                text=True
-            )
-            
-            if result.returncode != 0:
-                print(f"❌ Error clonando repositorio: {result.stderr}")
-                print(f"   URL intentada: {github_url}")
-                return None, None
-            
-            print(f"✅ Repositorio clonado exitosamente en: {clone_dir}")
-            return 'github', str(clone_dir)
-            
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Error clonando repositorio: {e}")
-            return None, None
-        except Exception as e:
-            print(f"❌ Error procesando repositorio: {e}")
-            import traceback
-            traceback.print_exc()
-            return None, None
-    
-    # Si no es reconocible
-    print(f"⚠️  Target no reconocido: {target}")
-    print("💡 Formatos soportados:")
-    print("   - URL de GitHub: https://github.com/usuario/repo")
-    print("   - Formato corto: usuario/repo (ej: alonsoir/test-zeromq-c-)")
-    print("   - Ruta local: ./ruta/al/proyecto")
-    return None, None
+    with open(config_file, 'r') as f:
+        return yaml.safe_load(f)
 
-def _run_sast_analysis(target_path, severity, exclude_venv, no_info=True, 
-                      filter_noise=True, max_issues=100):
-    """Ejecuta análisis SAST en el directorio target"""
+
+async def handle_sast_analysis(args):
+    """Manejador del comando de análisis SAST."""
+    print("\n" + "="*60)
+    print("🔍 TDH ENGINE - ANÁLISIS SAST")
+    print("="*60)
+    print(f"📦 Repositorio: {args.repo_url}")
+    print(f"📁 Directorio: {args.workdir}")
+    print(f"📊 Output: {args.output}")
+    print("="*60)
     
     try:
-        # Configurar entorno para evitar análisis de venv
-        if exclude_venv:
-            config_path = _create_exclusion_config(target_path, severity)
-        
-        # Usar SASTOrchestrator
-        orchestrator = SASTOrchestrator(target_path)
-        
-        # Actualizar severidad mínima si es necesario
-        if 'global' in orchestrator.sast_config:
-            orchestrator.sast_config['global']['min_severity'] = severity
+        # Inicializar SAST orchestrator
+        sast_config = load_config("sast_tools")
+        orchestrator = SASTOrchestrator(config_path=args.config)
         
         # Ejecutar análisis
-        results = orchestrator.analyze_directory(target_path)
-        
-        # Filtrar resultados según opciones
-        if 'issues' in results:
-            # Aplicar filtros
-            filtered_issues = []
-            
-            for issue in results['issues']:
-                issue_severity = issue.get('severity', 'UNKNOWN')
-                
-                # 1. Filtrar por severidad mínima
-                severity_order = {
-                    'CRITICAL': 0,
-                    'HIGH': 1,
-                    'MEDIUM': 2,
-                    'LOW': 3,
-                    'INFO': 4,
-                    'UNKNOWN': 5
-                }
-                
-                issue_level = severity_order.get(issue_severity, 99)
-                min_level = severity_order.get(severity, 99)
-                
-                if issue_level > min_level:
-                    continue
-                
-                # 2. Excluir INFO si no_info está activado
-                if no_info and issue_severity == 'INFO':
-                    continue
-                
-                # 3. Filtrar ruido común
-                if filter_noise:
-                    tool = issue.get('tool', '')
-                    message = issue.get('message', '').lower()
-                    rule_id = issue.get('rule_id', '').lower()
-                    
-                    # Filtros específicos para cppcheck
-                    if tool == 'cppcheck':
-                        noise_patterns = [
-                            'missingincludesystem',
-                            'missinginclude',
-                            'checkersreport',
-                            'unusedfunction',
-                            'unreadvariable',
-                            'unusedvariable',
-                            'variablehidesvariable',
-                            'functionstatic',
-                            'funcioneshouldbestatic',
-                            'stylistic'
-                        ]
-                        
-                        is_noise = any(pattern in rule_id or pattern in message 
-                                     for pattern in noise_patterns)
-                        if is_noise:
-                            continue
-                    
-                    # Filtros generales
-                    general_noise = [
-                        'style suggestion',
-                        'code style',
-                        'whitespace',
-                        'indentation',
-                        'line too long',
-                        'trailing whitespace',
-                        'missing docstring'
-                    ]
-                    
-                    if any(noise in message for noise in general_noise):
-                        continue
-                
-                filtered_issues.append(issue)
-            
-            # 4. Aplicar límite máximo de issues
-            if max_issues and len(filtered_issues) > max_issues:
-                print(f"📏 Limitando a {max_issues} issues (de {len(filtered_issues)})")
-                filtered_issues = filtered_issues[:max_issues]
-            
-            # Actualizar resultados
-            results['issues'] = filtered_issues
-            results['stats']['total_issues'] = len(filtered_issues)
-            
-            # Recalcular estadísticas por severidad
-            severity_counts = {}
-            for issue in filtered_issues:
-                sev = issue.get('severity', 'UNKNOWN')
-                severity_counts[sev] = severity_counts.get(sev, 0) + 1
-            
-            results['stats']['issues_by_severity'] = severity_counts
-        
-        return results
-        
-    except Exception as e:
-        print(f"❌ Error en análisis SAST: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-
-def _create_exclusion_config(target_path, severity):
-    """Crea configuración temporal para excluir venv y directorios no deseados"""
-    import yaml
-    
-    config_dir = Path(target_path) / '.tdh_temp'
-    config_dir.mkdir(exist_ok=True)
-    
-    config_path = config_dir / 'sast_tools_exclude.yaml'
-    
-    # Configuración con exclusiones
-    config = {
-        'global': {
-            'min_severity': severity,
-            'timeout_per_tool': 120
-        },
-        'exclusions': {
-            'global': {
-                'directories': [
-                    '**/venv/**',
-                    '**/.venv/**',
-                    '**/env/**',
-                    '**/.env/**',
-                    '**/__pycache__/**',
-                    '**/node_modules/**',
-                    '**/.git/**',
-                    '**/dist/**',
-                    '**/build/**',
-                    '**/target/**',
-                    '**/.tdh_temp/**'  # Excluir nuestra propia carpeta temporal
-                ],
-                'files': [
-                    '**/*.min.js',
-                    '**/*.min.css',
-                    '**/*.bundle.js',
-                    '**/*.log'
-                ]
-            }
-        }
-    }
-    
-    with open(config_path, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False)
-    
-    return config_path
-
-def _run_ast_analysis(target_path, output_dir):
-    """Ejecuta análisis AST usando github_analyzer.py"""
-    
-    # Primero verificar si github_analyzer.py existe
-    analyzer_path = Path(__file__).parent / 'github_analyzer.py'
-    
-    if not analyzer_path.exists():
-        print("⚠️  github_analyzer.py no encontrado, omitiendo análisis AST")
-        return {'warning': 'github_analyzer.py no encontrado', 'success': False}
-    
-    # Crear directorio para reportes AST
-    ast_output_dir = Path(output_dir) / 'ast'
-    ast_output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Comando para ejecutar github_analyzer.py
-    cmd = [
-        sys.executable, str(analyzer_path),
-        'analyze',
-        target_path,
-        '--output', 'json',
-        '--save-dir', str(ast_output_dir)
-    ]
-    
-    print(f"🔧 Ejecutando: {' '.join(cmd)}")
-    
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minutos timeout
+        results = await orchestrator.analyze_repository(
+            repo_path=args.workdir if args.workdir else args.repo_url,
+            output_dir=args.output
         )
         
-        if result.returncode == 0:
-            # Buscar el archivo JSON generado
-            json_files = list(ast_output_dir.glob('*.json'))
-            if json_files:
-                # Ordenar por fecha de modificación (más reciente primero)
-                json_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
-                latest_json = json_files[0]
-                with open(latest_json, 'r') as f:
-                    ast_data = json.load(f)
-                
-                return {
-                    'success': True,
-                    'report_path': str(latest_json),
-                    'data': ast_data
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': 'No se generó archivo JSON',
-                    'stdout': result.stdout[:500] if result.stdout else '',
-                    'stderr': result.stderr[:500] if result.stderr else ''
-                }
-        else:
-            return {
-                'success': False,
-                'error': f'Exit code {result.returncode}',
-                'stderr': result.stderr[:500] if result.stderr else '',
-                'stdout': result.stdout[:500] if result.stdout else ''
-            }
-            
-    except subprocess.TimeoutExpired:
-        return {
-            'success': False,
-            'error': 'Timeout (5 minutos) excedido'
-        }
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e)
-        }
-
-def _generate_combined_reports(resultados, target_name, output_dir, format):
-    """Genera reportes combinados en diferentes formatos"""
-    
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    # Crear nombre de archivo seguro
-    target_slug = "".join(c for c in target_name if c.isalnum() or c in ('-', '_')).rstrip()
-    if not target_slug:
-        target_slug = "unknown_target"
-    
-    reportes = []
-    
-    # 1. Reporte JSON combinado
-    if format in ['json', 'both']:
-        json_path = output_path / f"tdh_combined_{target_slug}_{timestamp}.json"
+        # Mostrar resultados
+        print(f"\n📊 RESULTADOS DEL ANÁLISIS SAST:")
+        print(f"   Total de issues: {results.get('summary', {}).get('total', 0)}")
         
-        combined_data = {
-            'metadata': {
-                'target': target_name,
-                'timestamp': timestamp,
-                'analysis_date': datetime.now().isoformat(),
-                'tdh_version': '0.3.0',
-                'filters_applied': {
-                    'min_severity': 'CRITICAL' if 'CRITICAL' in target_name else 'MEDIUM',
-                    'max_issues': 100,
-                    'filter_noise': True
-                }
-            },
-            'results': resultados
-        }
+        # Agrupar por severidad
+        severities = {}
+        for issue in results.get('issues', []):
+            sev = issue.get('severity', 'UNKNOWN')
+            severities[sev] = severities.get(sev, 0) + 1
         
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(combined_data, f, indent=2, ensure_ascii=False, cls=TDHJSONEncoder)
+        for sev, count in severities.items():
+            print(f"   {sev}: {count}")
         
-        reportes.append(('JSON', str(json_path)))
-        print(f"📄 Reporte JSON generado: {json_path}")
-    
-    # 2. Reporte HTML básico (simplificado)
-    if format in ['html', 'both']:
-        html_path = output_path / f"tdh_report_{target_slug}_{timestamp}.html"
+        # Guardar resultados si se especificó output
+        if args.output:
+            output_dir = Path(args.output)
+            output_dir.mkdir(parents=True, exist_ok=True)  # ¡CREAR DIRECTORIO!
+            output_file = output_dir / "sast_results.json"
+            with open(output_file, 'w') as f:
+                json.dump(results, f, indent=2)
+            print(f"\n💾 Resultados guardados en: {output_file}")
         
-        html_content = _generate_html_report(resultados, target_name, timestamp)
-        
-        with open(html_path, 'w', encoding='utf-8') as f:
-            f.write(html_content)
-        
-        reportes.append(('HTML', str(html_path)))
-        print(f"🌐 Reporte HTML generado: {html_path}")
-    
-    # 3. Reporte de consola (siempre se genera)
-    console_path = output_path / f"tdh_summary_{target_slug}_{timestamp}.txt"
-    summary = _generate_text_summary(resultados)
-    
-    with open(console_path, 'w', encoding='utf-8') as f:
-        f.write(summary)
-    
-    reportes.append(('TXT', str(console_path)))
-    
-    return reportes
-
-def _generate_html_report(resultados, target_name, timestamp):
-    """Genera un reporte HTML básico"""
-    
-    # Contar issues por severidad
-    sast_issues = resultados.get('sast', {}).get('issues', [])
-    ast_data = resultados.get('ast', {})
-    ast_issues = ast_data.get('data', {}).get('issues', []) if ast_data.get('success') else []
-    
-    # Estadísticas simples
-    stats = {
-        'sast_total': len(sast_issues),
-        'ast_total': len(ast_issues),
-        'total': len(sast_issues) + len(ast_issues),
-        'sast_by_severity': {},
-        'tools_used': set()
-    }
-    
-    for issue in sast_issues:
-        severity = issue.get('severity', 'UNKNOWN')
-        stats['sast_by_severity'][severity] = stats['sast_by_severity'].get(severity, 0) + 1
-        stats['tools_used'].add(issue.get('tool', 'unknown'))
-    
-    # Construir HTML
-    html_parts = []
-    
-    html_parts.append(f'''<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TDH Security Report - {target_name}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
-        .header {{ background: #2c3e50; color: white; padding: 20px; border-radius: 5px; }}
-        .stats {{ display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }}
-        .stat-box {{ background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; padding: 15px; flex: 1; min-width: 200px; }}
-        .severity-critical {{ color: #dc3545; font-weight: bold; }}
-        .severity-high {{ color: #fd7e14; font-weight: bold; }}
-        .severity-medium {{ color: #ffc107; font-weight: bold; }}
-        .severity-low {{ color: #28a745; font-weight: bold; }}
-        .issues-table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
-        .issues-table th, .issues-table td {{ border: 1px solid #dee2e6; padding: 10px; text-align: left; }}
-        .issues-table th {{ background: #f8f9fa; }}
-        .badge {{ display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 12px; background: #6c757d; color: white; }}
-        .badge-sast {{ background: #007bff; }}
-        .badge-ast {{ background: #17a2b8; }}
-        .filter-info {{ background: #e9ecef; padding: 10px; border-radius: 5px; margin: 15px 0; }}
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h1>🔍 TDH Security Analysis Report</h1>
-        <p><strong>Target:</strong> {target_name}</p>
-        <p><strong>Date:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-        <p><strong>Filters:</strong> CRITICAL/HIGH only, noise filtered</p>
-    </div>''')
-    
-    html_parts.append('''    
-    <div class="filter-info">
-        <p><strong>⚠️ Filtered Analysis:</strong> This report shows only CRITICAL and HIGH severity issues with common noise (missing includes, style suggestions, etc.) filtered out.</p>
-    </div>
-    
-    <div class="stats">
-        <div class="stat-box">
-            <h3>📊 Resumen</h3>
-            <p><strong>Total Issues:</strong> {total}</p>
-            <p><strong>SAST Issues:</strong> {sast_total}</p>
-            <p><strong>AST Issues:</strong> {ast_total}</p>
-        </div>'''.format(**stats))
-    
-    if stats['sast_by_severity']:
-        html_parts.append('''
-        <div class="stat-box">
-            <h3>⚠️ SAST por Severidad</h3>''')
-        
-        for severity, count in stats['sast_by_severity'].items():
-            html_parts.append(f'            <p><span class="severity-{severity.lower()}">{severity}:</span> {count}</p>')
-        
-        html_parts.append('''        </div>''')
-    
-    if stats['tools_used']:
-        html_parts.append('''
-        <div class="stat-box">
-            <h3>🛠️ Herramientas Usadas</h3>''')
-        
-        for tool in sorted(stats['tools_used']):
-            html_parts.append(f'            <p>{tool}</p>')
-        
-        html_parts.append('''        </div>''')
-    
-    html_parts.append('''    </div>''')
-    
-    # Sección SAST
-    html_parts.append(f'''    
-    <h2>🔧 Issues de SAST ({len(sast_issues)})</h2>''')
-    
-    if sast_issues:
-        html_parts.append('''    <table class="issues-table">
-        <thead>
-            <tr>
-                <th>Tool</th>
-                <th>Severity</th>
-                <th>File</th>
-                <th>Line</th>
-                <th>Message</th>
-            </tr>
-        </thead>
-        <tbody>''')
-        
-        for issue in sast_issues[:50]:  # Limitar a 50 issues en el HTML
-            severity_class = f"severity-{issue.get('severity', '').lower()}"
-            filename = issue.get('file', 'N/A')
-            if isinstance(filename, str) and '/' in filename:
-                filename = filename.split('/')[-1]
-            
-            html_parts.append(f'''            <tr>
-                <td><span class="badge badge-sast">{issue.get('tool', 'N/A')}</span></td>
-                <td><span class="{severity_class}">{issue.get('severity', 'N/A')}</span></td>
-                <td>{filename}</td>
-                <td>{issue.get('line', 'N/A')}</td>
-                <td>{str(issue.get('message', 'N/A'))[:100]}...</td>
-            </tr>''')
-        
-        html_parts.append('''        </tbody>
-    </table>''')
-        
-        if len(sast_issues) > 50:
-            html_parts.append(f'    <p>... y {len(sast_issues) - 50} issues más (ver reporte JSON completo)</p>')
-    else:
-        html_parts.append('    <p>✅ No se encontraron issues de SAST críticos/altos (¡Buen trabajo!)</p>')
-    
-    # Sección AST
-    html_parts.append(f'''
-    <h2>🧬 Issues de AST ({len(ast_issues)})</h2>''')
-    
-    if ast_issues:
-        html_parts.append('''    <table class="issues-table">
-        <thead>
-            <tr>
-                <th>Type</th>
-                <th>File</th>
-                <th>Line</th>
-                <th>Description</th>
-            </tr>
-        </thead>
-        <tbody>''')
-        
-        for issue in ast_issues[:50]:
-            filename = issue.get('file', 'N/A')
-            if isinstance(filename, str) and '/' in filename:
-                filename = filename.split('/')[-1]
-            
-            html_parts.append(f'''            <tr>
-                <td><span class="badge badge-ast">{issue.get('type', 'N/A')}</span></td>
-                <td>{filename}</td>
-                <td>{issue.get('line', 'N/A')}</td>
-                <td>{str(issue.get('description', 'N/A'))[:100]}...</td>
-            </tr>''')
-        
-        html_parts.append('''        </tbody>
-    </table>''')
-        
-        if len(ast_issues) > 50:
-            html_parts.append(f'    <p>... y {len(ast_issues) - 50} issues más (ver reporte JSON completo)</p>')
-    else:
-        html_parts.append('    <p>✅ No se encontraron issues de AST</p>')
-    
-    html_parts.append(f'''
-    <hr>
-    <footer>
-        <p>Generated by TDH Engine v0.3.0 • {timestamp}</p>
-        <p><em>Note: This is a filtered report showing only high-priority security issues.</em></p>
-    </footer>
-</body>
-</html>''')
-    
-    return '\n'.join(html_parts)
-
-def _generate_text_summary(resultados):
-    """Genera un resumen en texto para consola/archivo"""
-    
-    summary_lines = [
-        "=" * 60,
-        "TDH SECURITY ANALYSIS SUMMARY (FILTERED)",
-        "=" * 60,
-        "Showing only CRITICAL/HIGH severity issues with noise filtered",
-        ""
-    ]
-    
-    # SAST Summary
-    sast_data = resultados.get('sast', {})
-    sast_issues = sast_data.get('issues', [])
-    
-    summary_lines.append("🔧 SAST ANALYSIS:")
-    summary_lines.append(f"  Total Issues: {len(sast_issues)}")
-    
-    if sast_issues:
-        # Contar por severidad
-        by_severity = {}
-        for issue in sast_issues:
-            severity = issue.get('severity', 'UNKNOWN')
-            by_severity[severity] = by_severity.get(severity, 0) + 1
-        
-        if by_severity:
-            summary_lines.append("  By Severity:")
-            for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'UNKNOWN']:
-                if severity in by_severity:
-                    summary_lines.append(f"    {severity}: {by_severity[severity]}")
-        
-        # Mostrar issues críticos
-        critical_high_issues = [
-            issue for issue in sast_issues 
-            if issue.get('severity') in ['CRITICAL', 'HIGH']
-        ]
-        
-        if critical_high_issues:
-            summary_lines.append("")
-            summary_lines.append("⛔ CRITICAL/HIGH PRIORITY ISSUES:")
-            for i, issue in enumerate(critical_high_issues[:20], 1):
-                tool = issue.get('tool', 'unknown')
-                message = str(issue.get('message', ''))
-                filename = issue.get('file', '')
-                line = issue.get('line', '')
-                
-                # Acortar nombres de archivo largos
-                if len(filename) > 50:
-                    filename = "..." + filename[-47:]
-                
-                summary_lines.append(f"  {i:2d}. [{tool:10}] {message[:60]}...")
-                summary_lines.append(f"      📍 {filename}:{line}")
-    else:
-        summary_lines.append("  ✅ No critical/high severity issues found (good job!)")
-    
-    # AST Summary
-    ast_data = resultados.get('ast', {})
-    ast_issues = ast_data.get('data', {}).get('issues', []) if ast_data.get('success') else []
-    
-    summary_lines.append("")
-    summary_lines.append("🧬 AST ANALYSIS:")
-    summary_lines.append(f"  Total Issues: {len(ast_issues)}")
-    
-    if ast_issues:
-        # Contar por tipo
-        by_type = {}
-        for issue in ast_issues:
-            issue_type = issue.get('type', 'UNKNOWN')
-            by_type[issue_type] = by_type.get(issue_type, 0) + 1
-        
-        if by_type:
-            summary_lines.append("  By Type:")
-            for issue_type, count in sorted(by_type.items()):
-                summary_lines.append(f"    {issue_type}: {count}")
-    else:
-        summary_lines.append("  (AST analysis not run or no issues found)")
-    
-    summary_lines.append("")
-    summary_lines.append("=" * 60)
-    summary_lines.append("✅ Filtered analysis complete")
-    summary_lines.append("=" * 60)
-    
-    return "\n".join(summary_lines)
-
-def _print_summary(resultados, reportes_generados):
-    """Imprime resumen en consola"""
-    
-    print("\n" + "=" * 60)
-    print("📋 RESUMEN DEL ANÁLISIS (FILTRADO)")
-    print("=" * 60)
-    print("Mostrando solo issues CRITICAL/HIGH con ruido filtrado")
-    
-    # SAST
-    sast_issues = resultados.get('sast', {}).get('issues', [])
-    print(f"\n🔧 SAST Issues (filtrados): {len(sast_issues)}")
-    
-    if sast_issues:
-        by_severity = {}
-        for issue in sast_issues:
-            severity = issue.get('severity', 'UNKNOWN')
-            by_severity[severity] = by_severity.get(severity, 0) + 1
-        
-        for severity in ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO']:
-            if by_severity.get(severity):
-                print(f"  {severity}: {by_severity[severity]}")
-        
-        # Mostrar algunos issues críticos
-        critical_issues = [i for i in sast_issues if i.get('severity') == 'CRITICAL']
-        high_issues = [i for i in sast_issues if i.get('severity') == 'HIGH']
+        # Mostrar issues críticos si existen
+        critical_issues = [i for i in results.get('issues', []) 
+                          if i.get('severity') == 'CRITICAL']
         
         if critical_issues:
-            print(f"\n🔴 CRITICAL Issues ({len(critical_issues)}):")
-            for i, issue in enumerate(critical_issues[:5], 1):
-                print(f"  {i}. [{issue.get('tool')}] {issue.get('message', '')[:60]}...")
+            print(f"\n⚠️  VULNERABILIDADES CRÍTICAS ENCONTRADAS ({len(critical_issues)}):")
+            for idx, issue in enumerate(critical_issues[:5], 1):  # Mostrar solo 5
+                print(f"\n   {idx}. {issue.get('rule_id', 'Unknown')}")
+                print(f"      📄 {issue.get('file', 'Unknown')}:{issue.get('line', 'Unknown')}")
+                print(f"      📝 {issue.get('message', 'No description')[:100]}...")
         
-        if high_issues:
-            print(f"\n🟠 HIGH Issues ({len(high_issues)}):")
-            for i, issue in enumerate(high_issues[:5], 1):
-                print(f"  {i}. [{issue.get('tool')}] {issue.get('message', '')[:60]}...")
-    
-    # AST
-    ast_data = resultados.get('ast', {})
-    if ast_data.get('success'):
-        ast_issues = ast_data.get('data', {}).get('issues', [])
-        print(f"\n🧬 AST Issues: {len(ast_issues)}")
-    else:
-        error_msg = ast_data.get('error', 'No ejecutado')
-        if error_msg != 'No ejecutado':
-            print(f"\n🧬 AST: {error_msg[:50]}{'...' if len(error_msg) > 50 else ''}")
-        else:
-            print("\n🧬 AST: No ejecutado")
-    
-    # Reportes
-    if reportes_generados:
-        print("\n📁 REPORTES GENERADOS:")
-        for formato, ruta in reportes_generados:
-            print(f"  {formato}: {ruta}")
-    else:
-        print("\n📁 No se generaron reportes (posible error en el análisis)")
-    
-    print("\n" + "=" * 60)
-    print("✅ ANÁLISIS FILTRADO COMPLETADO")
-    print("=" * 60)
+        print("\n✅ Análisis SAST completado")
+        
+    except Exception as e:
+        print(f"\n❌ Error en análisis SAST: {e}")
+        import traceback
+        traceback.print_exc()
 
-# ============================================================================
-# LLM COUNCIL COMMANDS - Funcionalidades asíncronas del Consejo de LLMs
-# ============================================================================
 
-@cli.group()
-def council():
-    """Comandos para gestionar el Consejo de LLMs SOTA"""
-    pass
-
-@council.command()
-@click.option('--config', default='config/llm_council.yaml', 
-              help='Ruta al archivo de configuración del consejo')
-@click.option('--openrouter-key', envvar='OPENROUTER_API_KEY',
-              help='API Key de OpenRouter (por defecto de OPENROUTER_API_KEY env)')
-def init(config, openrouter_key):
-    """Inicializar el consejo de LLMs (verificar disponibilidad)"""
-    asyncio.run(_init_council(config, openrouter_key))
-
-@council.command()
-@click.option('--config', default='config/llm_council.yaml',
-              help='Ruta al archivo de configuración del consejo')
-def status(config):
-    """Mostrar estado del consejo de LLMs"""
-    asyncio.run(_council_status(config))
-
-@council.command()
-@click.argument('repo')
-@click.argument('issue_id')
-@click.option('--config', default='config/llm_council.yaml',
-              help='Ruta al archivo de configuración del consejo')
-@click.option('--output-dir', default='.',
-              help='Directorio de salida para los worktrees')
-@click.option('--github-token', envvar='GITHUB_TOKEN',
-              help='Token de GitHub para operaciones de repo')
-@click.option('--openrouter-key', envvar='OPENROUTER_API_KEY',
-              help='API Key de OpenRouter')
-@click.option('--base-branch', default='main',
-              help='Rama base para crear las ramas de fix')
-@click.option('--llm-count', default=3, type=int,
-              help='Número de LLMs a usar (máximo los disponibles)')
-@click.option('--keep-remote', is_flag=True, default=False,
-              help='Mantener ramas remotas después del análisis')
-def fix(repo, issue_id, config, output_dir, github_token, 
-        openrouter_key, base_branch, llm_count, keep_remote):
-    """
-    Ejecutar fix multi-LLM para una vulnerabilidad específica
+async def handle_council_analysis(args):
+    """Manejador del comando de consejo de LLMs."""
+    print("\n" + "="*60)
+    print("🏛️  TDH ENGINE - CONSEJO DE LLMs")
+    print("="*60)
+    print(f"📦 Repositorio: {args.repo_url}")
+    print(f"🧠 LLMs: {args.llm_count}")
+    print(f"📁 Worktrees: {args.worktree_base}")
+    print("="*60)
     
-    REPO: URL del repositorio (https://github.com/owner/repo.git)
-    ISSUE_ID: Identificador del issue a fixear (ej: CWE-120-buffer-overflow)
-    """
-    asyncio.run(_multi_llm_fix(
-        repo=repo,
-        issue_id=issue_id,
-        config_path=config,
-        output_dir=output_dir,
-        github_token=github_token,
-        openrouter_key=openrouter_key,
-        base_branch=base_branch,
-        llm_count=llm_count,
-        keep_remote=keep_remote
-    ))
-
-async def _init_council(config_path, openrouter_key):
-    """Inicializa el consejo de LLMs y verifica disponibilidad"""
-    if openrouter_key:
-        os.environ['OPENROUTER_API_KEY'] = openrouter_key
-    
-    print("🤖 Inicializando Consejo de LLMs SOTA...")
-    print(f"   Config: {config_path}")
-    
-    council = LLMCouncil(config_path)
-    available, names = await council.initialize_council()
-    
-    print(f"\n✅ Consejo inicializado con {available} LLMs disponibles:")
-    for name in names:
-        print(f"   • {name}")
-    
-    if available == 0:
-        print("\n❌ No hay LLMs disponibles. Verifica:")
-        print("   1. Configuración en: config/llm_council.yaml")
-        print("   2. Variable de entorno: OPENROUTER_API_KEY")
-        print("   3. Conexión a internet")
-
-async def _council_status(config_path):
-    """Muestra el estado del consejo de LLMs"""
-    council = LLMCouncil(config_path)
-    status = council.get_council_status()
-    
-    print("\n📊 ESTADO DEL CONSEJO DE LLMs:")
-    print(f"   Total LLMs configurados: {status['total_llms']}")
-    print(f"   LLMs disponibles: {', '.join(status['available_llms'])}")
-    print(f"   Tareas activas: {status['active_tasks']}")
-    print(f"   Issues completados: {len(status['completed_issues'])}")
-
-async def _multi_llm_fix(repo, issue_id, config_path, output_dir, 
-                        github_token, openrouter_key, base_branch, 
-                        llm_count, keep_remote):
-    """Ejecuta un fix multi-LLM para una vulnerabilidad específica"""
-    
-    print("\n" + "=" * 60)
-    print("🚀 INICIANDO FIX MULTI-LLM")
-    print("=" * 60)
-    print(f"   Repositorio: {repo}")
-    print(f"   Issue ID: {issue_id}")
-    print(f"   Config: {config_path}")
-    print(f"   Base Branch: {base_branch}")
-    print(f"   LLMs a usar: {llm_count}")
-    
-    # Configurar API keys si se proporcionan
-    if openrouter_key:
-        os.environ['OPENROUTER_API_KEY'] = openrouter_key
-    
-    # 1. Inicializar worktree manager
-    worktree_mgr = GitWorktreeManager(
-        repo_url=repo,
-        github_token=github_token,
-        base_dir=output_dir
-    )
-    
-    # 2. Setup repo principal
-    worktree_mgr.setup_main_repo()
-    
-    # 3. Inicializar consejo
-    council = LLMCouncil(config_path)
-    available_count, available_names = await council.initialize_council()
-    
-    if available_count == 0:
-        print("❌ No hay LLMs disponibles para trabajar")
-        return
-    
-    # Limitar número de LLMs a usar
-    llms_to_use = council.llms[:min(llm_count, available_count)]
-    print(f"🤖 Usando {len(llms_to_use)} LLMs: {[llm.name for llm in llms_to_use]}")
-    
-    # 4. Obtener issue de SAST (simulado por ahora - en el futuro vendrá del análisis real)
-    sast_issue = {
-        "rule_id": issue_id,
-        "severity": "CRITICAL",
-        "message": f"Security vulnerability: {issue_id}",
-        "file": "src/vulnerable.c",  # Esto será dinámico en el futuro
-        "line": 42,
-        "tool": "cppcheck"
-    }
-    
-    print(f"\n🔍 Vulnerabilidad a fixear:")
-    print(f"   ID: {sast_issue['rule_id']}")
-    print(f"   Severidad: {sast_issue['severity']}")
-    print(f"   Descripción: {sast_issue['message']}")
-    print(f"   Archivo: {sast_issue['file']}:{sast_issue['line']}")
-    
-    # 5. Ejecutar fixes en paralelo
-    llm_results = {}
-    
-    for llm in llms_to_use:
-        try:
-            print(f"\n{'='*40}")
-            print(f"🌿 Procesando con {llm.name}")
-            print(f"{'='*40}")
-            
-            # Crear worktree específico para este LLM
-            worktree_dir, branch_name = worktree_mgr.create_worktree_for_llm(
-                llm_name=llm.name,
-                issue_id=issue_id,
-                base_branch=base_branch
-            )
-            
-            # Preparar contexto para el LLM
-            context = worktree_mgr.prepare_llm_context(branch_name, sast_issue)
-            
-            # LLM genera fix
-            print(f"   🤖 {llm.name} generando fix...")
-            fixed_files = await llm.generate_fix(context)
-            
-            if fixed_files:
-                # Aplicar fix al worktree
-                commit_hash = worktree_mgr.apply_llm_fix(
-                    branch_name=branch_name,
-                    fixed_files=fixed_files,
-                    llm_name=llm.name
+    try:
+        # Cargar configuración
+        council_config = load_config("llm_council")
+        
+        # Inicializar gestor de worktrees
+        worktree_manager = GitWorktreeManager(
+            base_worktree_dir=Path(args.worktree_base),
+            github_token=args.github_token
+        )
+        
+        await worktree_manager.initialize(args.repo_url)
+        
+        # Inicializar consejo
+        council = LLMCouncil(config_path=args.config)
+        llms = await council.initialize_council()
+        
+        print(f"\n✅ Consejo inicializado con {len(llms)} LLMs")
+        
+        # Preparar contexto para LLMs
+        print("\n📋 Preparando contexto para LLMs...")
+        
+        # Buscar vulnerabilidades (usar SAST o mock)
+        sast_config = load_config("sast_tools")
+        orchestrator = SASTOrchestrator(config_path=args.config)
+        
+        # Analizar repositorio
+        results = await orchestrator.analyze_repository(
+            repo_path=worktree_manager.repo_dir if hasattr(worktree_manager, 'repo_dir') else args.repo_url
+        )
+        
+        # Filtrar vulnerabilidades críticas
+        critical_issues = [i for i in results.get('issues', []) 
+                          if i.get('severity') == 'CRITICAL']
+        
+        if not critical_issues:
+            print("⚠️  No se encontraron vulnerabilidades críticas, usando ejemplo...")
+            # Usar vulnerabilidad de ejemplo
+            critical_issues = [{
+                'rule_id': 'CWE-78',
+                'severity': 'CRITICAL',
+                'confidence': 'HIGH',
+                'message': 'Possible command injection',
+                'file': 'src/vulnerable.c',
+                'line': 42,
+                'cwe': 'CWE-78',
+                'owasp': 'A1:2017-Injection',
+                'more_info': 'https://cwe.mitre.org/data/definitions/78.html'
+            }]
+        
+        # Seleccionar primera vulnerabilidad
+        target_vuln = critical_issues[0]
+        
+        print(f"\n🎯 Vulnerabilidad objetivo:")
+        print(f"   ID: {target_vuln.get('rule_id')}")
+        print(f"   Desc: {target_vuln.get('message')}")
+        print(f"   Archivo: {target_vuln.get('file')}")
+        
+        # Crear worktrees para cada LLM
+        print(f"\n📁 Creando worktrees para LLMs...")
+        
+        worktree_info = {}
+        for llm in llms[:args.llm_count]:  # Limitar al número solicitado
+            try:
+                info = worktree_manager.create_worktree_for_llm(
+                    llm_name=llm.name,
+                    issue_id=target_vuln.get('rule_id', 'test')
+                )
+                if info:
+                    worktree_dir, branch_name = info
+                    worktree_info[llm.name] = {
+                        'dir': worktree_dir,
+                        'branch': branch_name
+                    }
+                    print(f"   ✅ {llm.name}: {branch_name}")
+            except Exception as e:
+                print(f"   ❌ Error creando worktree para {llm.name}: {e}")
+        
+        # Preparar y enviar contexto a cada LLM
+        print(f"\n📤 Enviando contexto a LLMs...")
+        
+        llm_results = {}
+        for llm_name, info in list(worktree_info.items())[:args.llm_count]:
+            try:
+                # Preparar contexto enriquecido
+                context = await worktree_manager.prepare_llm_context(
+                    issue_id=target_vuln.get('rule_id'),
+                    sast_issue=target_vuln,
+                    include_related=True
                 )
                 
-                if commit_hash:  # Si hubo cambios
-                    # Hacer push a GitHub
-                    success, push_url = worktree_mgr.push_to_github(branch_name)
+                # Encontrar el LLM correspondiente
+                llm_obj = next((l for l in llms if l.name == llm_name), None)
+                if llm_obj:
+                    # Solicitar fix al LLM
+                    response = await llm_obj.generate_fix({
+                        'vulnerability': target_vuln,
+                        'context': context,
+                        'worktree_dir': info['dir'],
+                        'branch_name': info['branch']
+                    })
                     
-                    if success:
-                        # Crear Pull Request
-                        pr_url = worktree_mgr.create_pull_request(branch_name)
-                        
-                        llm_results[llm.name] = {
-                            "success": True,
-                            "branch": branch_name,
-                            "commit": commit_hash[:8],
-                            "pr_url": pr_url,
-                            "push_url": push_url
-                        }
-                        
-                        print(f"   ✅ {llm.name}: Fix completado y PR creado")
-                        print(f"      PR: {pr_url}")
-                    else:
-                        llm_results[llm.name] = {
-                            "success": False,
-                            "error": "Push failed",
-                            "branch": branch_name
-                        }
-                else:
-                    print(f"   ⚠️  {llm.name}: No se realizaron cambios")
-                    llm_results[llm.name] = {
-                        "success": False,
-                        "error": "No changes made",
-                        "branch": branch_name
+                    llm_results[llm_name] = {
+                        'success': True,
+                        'response': response,
+                        'worktree': info
                     }
-            else:
-                print(f"   ⚠️  {llm.name}: No se generó fix")
-                llm_results[llm.name] = {
-                    "success": False,
-                    "error": "No fix generated",
-                    "branch": branch_name
+                    
+                    print(f"   ✅ {llm_name}: Fix generado")
+                    
+                    # Intentar aplicar el fix
+                    try:
+                        if 'fixed_code' in response:
+                            # Aplicar fix
+                            commit_hash = worktree_manager.apply_llm_fix(
+                                branch_name=info['branch'],
+                                fixed_files=response['fixed_code'],
+                                llm_name=llm_name
+                            )
+                            
+                            if commit_hash:
+                                # Hacer push
+                                success, push_url = worktree_manager.push_to_github(info['branch'])
+                                
+                                if success:
+                                    # Crear PR
+                                    pr_url = worktree_manager.create_pull_request(info['branch'])
+                                    llm_results[llm_name]['pr_url'] = pr_url
+                                    print(f"   🔗 {llm_name}: PR creada - {pr_url}")
+                    except Exception as e:
+                        print(f"   ⚠️  Error aplicando fix de {llm_name}: {e}")
+                
+            except Exception as e:
+                llm_results[llm_name] = {
+                    'success': False,
+                    'error': str(e)
                 }
+                print(f"   ❌ Error con {llm_name}: {e}")
+        
+        # Guardar resultados
+        output_dir = Path(args.output) if args.output else Path(".")
+        output_dir.mkdir(exist_ok=True)
+        
+        results_file = output_dir / "council_results.json"
+        with open(results_file, 'w') as f:
+            json.dump({
+                'vulnerability': target_vuln,
+                'llm_results': llm_results,
+                'timestamp': datetime.now().isoformat()
+            }, f, indent=2)
+        
+        print(f"\n💾 Resultados guardados en: {results_file}")
+        print("✅ Consejo de LLMs completado")
+        
+    except Exception as e:
+        print(f"\n❌ Error en consejo de LLMs: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def handle_council_fix_with_states(args):
+    """Manejador del comando council-fix-with-states."""
+    print("\n" + "="*70)
+    print("🤖 TDH ENGINE - FIX CON MÁQUINAS DE ESTADOS")
+    print("="*70)
+    print(f"📦 Repositorio: {args.repo_url}")
+    print(f"🧠 LLMs: {args.llm_count} (con máquinas de estados)")
+    print(f"⚠️  Severidad mínima: {args.severity}")
+    print(f"📁 Worktrees: {args.worktree_base}")
+    print("="*70 + "\n")
+    
+    try:
+        # Paso 1: Ejecutar SAST para encontrar vulnerabilidades reales
+        print("🔍 Paso 1: Ejecutando análisis SAST...")
+        sast_config = load_config("sast_tools")
+        orchestrator = SASTOrchestrator(config_path=args.config)
+        
+        sast_results = await orchestrator.analyze_repository(
+            repo_path=args.repo_url,
+            output_dir=None
+        )
+        
+        if not sast_results or 'issues' not in sast_results:
+            print("❌ No se encontraron vulnerabilidades o error en SAST")
+            return
+        
+        # Filtrar por severidad
+        critical_issues = [
+            issue for issue in sast_results['issues']
+            if issue.get('severity', '').upper() == args.severity.upper()
+        ]
+        
+        if not critical_issues:
+            print(f"⚠️  No hay vulnerabilidades con severidad {args.severity}")
+            # Mostrar disponibles
+            severities = {}
+            for issue in sast_results['issues']:
+                sev = issue.get('severity', 'UNKNOWN')
+                severities[sev] = severities.get(sev, 0) + 1
             
-        except Exception as e:
-            print(f"❌ Error con {llm.name}: {e}")
-            llm_results[llm.name] = {
-                "success": False,
-                "error": str(e)
-            }
-    
-    # 6. Mostrar resultados finales
-    print(f"\n{'='*60}")
-    print("📊 RESULTADOS FINALES DEL FIX MULTI-LLM")
-    print(f"{'='*60}")
-    
-    successful_fixes = [r for r in llm_results.values() if r.get("success")]
-    
-    print(f"\n🎯 {len(successful_fixes)}/{len(llm_results)} LLMs completaron exitosamente")
-    
-    if successful_fixes:
-        print("\n✅ Fixes exitosos:")
-        for llm_name, result in llm_results.items():
-            if result.get("success"):
-                print(f"   • {llm_name}:")
-                print(f"      Rama: {result.get('branch')}")
-                print(f"      Commit: {result.get('commit')}")
-                print(f"      PR: {result.get('pr_url')}")
-    
-    # 7. Limpieza
-    print(f"\n🧹 Limpiando worktrees locales...")
-    worktree_mgr.cleanup_all(keep_remote=keep_remote)
-    
-    print(f"\n✅ Proceso completado")
-    print(f"💡 Para revisar los fixes, visita las URLs de los Pull Requests")
-    
-    # 8. Guardar resultados en archivo
-    results_file = Path(output_dir) / f"llm_fix_results_{issue_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(results_file, 'w') as f:
-        json.dump({
-            "issue_id": issue_id,
-            "repo": repo,
-            "timestamp": datetime.now().isoformat(),
-            "results": llm_results
-        }, f, indent=2)
-    
-    print(f"📄 Resultados guardados en: {results_file}")
+            print("📊 Vulnerabilidades encontradas:")
+            for sev, count in severities.items():
+                print(f"   {sev}: {count}")
+            return
+        
+        print(f"✅ Encontradas {len(critical_issues)} vulnerabilidades {args.severity}")
+        
+        # Seleccionar la primera vulnerabilidad para demostración
+        target_vulnerability = critical_issues[0]
+        print(f"\n🎯 Target: {target_vulnerability.get('rule_id', 'unknown')}")
+        print(f"   Desc: {target_vulnerability.get('message', 'No description')}")
+        print(f"   Archivo: {target_vulnerability.get('file', 'unknown')}")
+        
+        # Paso 2: Inicializar gestor de worktrees
+        print("\n📁 Paso 2: Inicializando gestor de worktrees...")
+        
+        worktree_manager = GitWorktreeManager(
+            base_worktree_dir=Path(args.worktree_base),
+            github_token=args.github_token if hasattr(args, 'github_token') else None
+        )
+        
+        await worktree_manager.initialize(args.repo_url)
+        print(f"✅ Worktree manager inicializado")
+        
+        # Paso 3: Crear consejo con máquinas de estados
+        print("\n🏛️  Paso 3: Creando consejo con máquinas de estados...")
+        council = EnhancedLLMCouncil(config_path=args.config)
+        
+        state_machines = await council.initialize_with_state_machines(worktree_manager)
+        
+        if not state_machines:
+            print("❌ No se pudieron crear máquinas de estados")
+            return
+        
+        print(f"✅ Consejo inicializado con {len(state_machines)} máquinas de estados")
+        
+        # Paso 4: Orquestar fix de la vulnerabilidad
+        print("\n🚀 Paso 4: Orquestando fix con máquinas de estados...")
+        print("   Cada LLM ejecutará su workflow completo:")
+        print("   1. 🔍 Analizar vulnerabilidad")
+        print("   2. 🧪 Diseñar test conceptual")
+        print("   3. 🔧 Diseñar fix")
+        print("   4. 📝 Documentar solución")
+        print("   5. 🏛️  Participar en consejo")
+        print("   6. 🔗 Crear PR\n")
+        
+        results = await council.orchestrate_vulnerability_fix(
+            repo_url=args.repo_url,
+            vulnerability=target_vulnerability
+        )
+        
+        # Paso 5: Guardar resultados
+        print("\n💾 Paso 5: Guardando resultados...")
+        output_dir = Path(args.output_dir)
+        output_dir.mkdir(exist_ok=True)
+        
+        # Guardar reporte completo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_file = output_dir / f"tdh_report_{timestamp}.json"
+        
+        with open(report_file, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Reporte guardado en: {report_file}")
+        
+        # Generar resumen en markdown
+        summary_file = output_dir / f"tdh_summary_{timestamp}.md"
+        await generate_summary_markdown(results, summary_file, target_vulnerability)
+        
+        print(f"✅ Resumen guardado en: {summary_file}")
+        
+        # Mostrar resultados finales
+        print("\n" + "="*70)
+        print("🎉 FIX CON MÁQUINAS DE ESTADOS COMPLETADO")
+        print("="*70)
+        
+        successful = results.get('summary', {}).get('successful', 0)
+        total = results.get('summary', {}).get('total_llms', 0)
+        
+        print(f"📊 Resultados: {successful}/{total} LLMs exitosos")
+        
+        # Mostrar PRs generadas
+        prs = []
+        for llm_name, solution in results.get('solutions', {}).items():
+            if solution.get('pr_url'):
+                prs.append(f"   • {llm_name}: {solution['pr_url']}")
+        
+        if prs:
+            print("\n🔗 PRs Generadas:")
+            for pr in prs:
+                print(pr)
+        
+        print(f"\n📋 Ver reporte completo en: {report_file}")
+        print("="*70)
+        
+    except Exception as e:
+        print(f"\n❌ Error en fix con máquinas de estados: {e}")
+        import traceback
+        traceback.print_exc()
 
-@cli.command()
-def version():
-    """Muestra la versión de TDH Unified Analyzer"""
-    print("TDH Unified Analyzer v0.3.0")
-    print("Test-Driven Hardening Engine with LLM Council")
 
-if __name__ == '__main__':
-    cli()
+async def generate_summary_markdown(results: Dict, output_file: Path, vulnerability: Dict):
+    """Genera resumen markdown de los resultados."""
+    
+    summary = f"""# TDH Engine - Reporte de Ejecución
+
+## 📅 Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## 🎯 Vulnerabilidad Objetivo
+- **ID**: {vulnerability.get('rule_id', 'N/A')}
+- **Severidad**: {vulnerability.get('severity', 'N/A')}
+- **Archivo**: `{vulnerability.get('file', 'N/A')}`
+- **Línea**: {vulnerability.get('line', 'N/A')}
+- **Descripción**: {vulnerability.get('message', 'N/A')}
+
+## 📊 Resultados Generales
+- **Total LLMs**: {results.get('summary', {}).get('total_llms', 0)}
+- **Exitosos**: {results.get('summary', {}).get('successful', 0)}
+- **Fallidos**: {results.get('summary', {}).get('failed', 0)}
+- **Tasa de éxito**: {results.get('summary', {}).get('success_rate', '0%')}
+
+## 🤖 Soluciones por LLM
+
+"""
+    
+    for llm_name, solution in results.get('solutions', {}).items():
+        status = "✅ ÉXITO" if solution.get('status') == 'success' else "❌ FALLO"
+        
+        summary += f"### {llm_name} - {status}\n\n"
+        
+        if solution.get('status') == 'success':
+            summary += f"- **Rama**: `{solution.get('branch', 'N/A')}`\n"
+            if solution.get('pr_url'):
+                summary += f"- **PR**: [{solution.get('pr_url')}]({solution.get('pr_url')})\n"
+            if solution.get('commit'):
+                summary += f"- **Commit**: `{solution.get('commit')}`\n"
+            
+            summary += f"- **Test diseñado**: {'Sí' if solution.get('has_test') else 'No'}\n"
+            summary += f"- **Fix generado**: {'Sí' if solution.get('has_fix') else 'No'}\n"
+            summary += f"- **Documentación**: {'Sí' if solution.get('has_documentation') else 'No'}\n"
+        else:
+            summary += f"- **Error**: {solution.get('error', 'Desconocido')}\n"
+        
+        summary += "\n---\n\n"
+    
+    # Recomendaciones
+    summary += "## 💡 Recomendaciones del Consejo\n\n"
+    for rec in results.get('recommendations', []):
+        summary += f"- {rec}\n"
+    
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(summary)
+
+
+async def handle_state_machine_test(args):
+    """Manejador para probar máquinas de estados."""
+    print("\n" + "="*70)
+    print("🧪 TDH ENGINE - PRUEBA DE MÁQUINAS DE ESTADOS")
+    print("="*70)
+    
+    try:
+        # Importar módulo de prueba
+        from tests.test_state_machines import test_state_machine_workflow, test_enhanced_council
+        
+        if args.test_type == "workflow":
+            print("🧪 Probando workflow de máquina de estados...")
+            await test_state_machine_workflow()
+        elif args.test_type == "council":
+            print("🏛️  Probando consejo mejorado...")
+            await test_enhanced_council()
+        else:
+            print("🔧 Ejecutando todas las pruebas...")
+            await test_state_machine_workflow()
+            await test_enhanced_council()
+        
+        print("\n✅ Pruebas completadas exitosamente")
+        
+    except Exception as e:
+        print(f"\n❌ Error en pruebas: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+async def handle_worktree_manager(args):
+    """Manejador para operaciones con worktrees."""
+    print("\n" + "="*60)
+    print("📁 TDH ENGINE - GESTOR DE WORKTREES")
+    print("="*60)
+    
+    try:
+        worktree_manager = GitWorktreeManager(
+            base_worktree_dir=Path(args.worktree_base),
+            github_token=args.github_token
+        )
+        
+        if args.action == "init":
+            print(f"📦 Inicializando con repositorio: {args.repo_url}")
+            await worktree_manager.initialize(args.repo_url)
+            print("✅ Worktree manager inicializado")
+            
+        elif args.action == "create":
+            print(f"🏗️  Creando worktree para LLM: {args.llm_name}")
+            worktree_info = worktree_manager.create_worktree_for_llm(
+                llm_name=args.llm_name,
+                issue_id=args.issue_id or "test"
+            )
+            
+            if worktree_info:
+                worktree_dir, branch_name = worktree_info
+                print(f"✅ Worktree creado:")
+                print(f"   📁 Directorio: {worktree_dir}")
+                print(f"   🌿 Rama: {branch_name}")
+            else:
+                print("❌ No se pudo crear worktree")
+                
+        elif args.action == "list":
+            print("📋 Worktrees activos:")
+            worktrees = worktree_manager.list_worktrees()
+            for wt in worktrees:
+                print(f"   • {wt}")
+                
+        elif args.action == "cleanup":
+            print("🧹 Limpiando worktrees...")
+            cleaned = worktree_manager.cleanup_worktrees()
+            print(f"✅ Worktrees eliminados: {cleaned}")
+        
+        print("\n✅ Operación completada")
+        
+    except Exception as e:
+        print(f"\n❌ Error en gestor de worktrees: {e}")
+
+
+def main():
+    """Función principal del CLI."""
+    parser = argparse.ArgumentParser(
+        description="TDH Engine - Test-Driven Hardening Engine",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Ejemplos de uso:
+  # Análisis SAST de un repositorio
+  python tdh_unified.py sast https://github.com/user/repo.git --output ./results
+  
+  # Consejo de LLMs tradicional
+  python tdh_unified.py council https://github.com/user/repo.git --llm-count 3
+  
+  # Fix con máquinas de estados (recomendado)
+  python tdh_unified.py council-fix-with-states https://github.com/user/repo.git
+  
+  # Probar máquinas de estados
+  python tdh_unified.py test-states --test-type workflow
+  
+  # Gestionar worktrees
+  python tdh_unified.py worktree init https://github.com/user/repo.git
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest='command', help='Comandos disponibles')
+    
+    # Comando: sast
+    sast_parser = subparsers.add_parser('sast', help='Ejecutar análisis SAST')
+    sast_parser.add_argument('repo_url', help='URL del repositorio')
+    sast_parser.add_argument('--workdir', help='Directorio de trabajo (si ya está clonado)')
+    sast_parser.add_argument('--output', '-o', help='Directorio para resultados')
+    sast_parser.add_argument('--config', '-c', help='Archivo de configuración')
+    sast_parser.set_defaults(func=handle_sast_analysis)
+    
+    # Comando: council
+    council_parser = subparsers.add_parser('council', help='Consejo tradicional de LLMs')
+    council_parser.add_argument('repo_url', help='URL del repositorio')
+    council_parser.add_argument('--llm-count', '-n', type=int, default=3, help='Número de LLMs')
+    council_parser.add_argument('--worktree-base', default='/tmp/tdh_worktrees', help='Directorio base para worktrees')
+    council_parser.add_argument('--github-token', help='Token de GitHub (para PRs)')
+    council_parser.add_argument('--output', '-o', help='Directorio para resultados')
+    council_parser.add_argument('--config', '-c', help='Archivo de configuración')
+    council_parser.set_defaults(func=handle_council_analysis)
+    
+    # Comando: council-fix-with-states
+    council_fix_parser = subparsers.add_parser(
+        'council-fix-with-states', 
+        help='Fix completo con máquinas de estados (NUEVO)'
+    )
+    council_fix_parser.add_argument('repo_url', help='URL del repositorio')
+    council_fix_parser.add_argument('--llm-count', '-n', type=int, default=3, 
+                                   help='Número de LLMs (default: 3)')
+    council_fix_parser.add_argument('--severity', default='CRITICAL',
+                                   help='Severidad mínima (default: CRITICAL)')
+    council_fix_parser.add_argument('--worktree-base', default='/tmp/tdh_worktrees',
+                                   help='Directorio base para worktrees')
+    council_fix_parser.add_argument('--github-token', help='Token de GitHub')
+    council_fix_parser.add_argument('--output-dir', default='./tdh_results',
+                                   help='Directorio para resultados')
+    council_fix_parser.add_argument('--config', '-c', help='Archivo de configuración')
+    council_fix_parser.set_defaults(func=handle_council_fix_with_states)
+    
+    # Comando: test-states
+    test_parser = subparsers.add_parser('test-states', help='Probar máquinas de estados')
+    test_parser.add_argument('--test-type', choices=['workflow', 'council', 'all'], 
+                            default='all', help='Tipo de prueba')
+    test_parser.add_argument('--config', '-c', help='Archivo de configuración')
+    test_parser.set_defaults(func=handle_state_machine_test)
+    
+    # Comando: worktree
+    worktree_parser = subparsers.add_parser('worktree', help='Gestionar worktrees')
+    worktree_parser.add_argument('action', choices=['init', 'create', 'list', 'cleanup'],
+                                help='Acción a realizar')
+    worktree_parser.add_argument('repo_url', nargs='?', help='URL del repositorio (para init)')
+    worktree_parser.add_argument('--llm-name', help='Nombre del LLM (para create)')
+    worktree_parser.add_argument('--issue-id', help='ID de issue (para create)')
+    worktree_parser.add_argument('--worktree-base', default='/tmp/tdh_worktrees',
+                                help='Directorio base para worktrees')
+    worktree_parser.add_argument('--github-token', help='Token de GitHub')
+    worktree_parser.set_defaults(func=handle_worktree_manager)
+    
+    # Parsear argumentos
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+    
+    args = parser.parse_args()
+    
+    # Ejecutar comando
+    try:
+        asyncio.run(args.func(args))
+    except AttributeError:
+        parser.print_help()
+    except KeyboardInterrupt:
+        print("\n\n⏹️  Ejecución interrumpida por el usuario")
+    except Exception as e:
+        print(f"\n❌ Error inesperado: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    # Banner
+    print("""
+    ╔══════════════════════════════════════════════════╗
+    ║      🤖 TDH ENGINE - Test-Driven Hardening       ║
+    ║         Version 2.0 - Máquinas de Estados        ║
+    ╚══════════════════════════════════════════════════╝
+    """)
+    
+    # Verificar configuración
+    config_dir = Path("config")
+    if not config_dir.exists():
+        print("⚠️  Config directory not found. Creating with defaults...")
+        config_dir.mkdir(exist_ok=True)
+    
+    # Verificar API key para OpenRouter
+    if 'OPENROUTER_API_KEY' not in os.environ:
+        print("⚠️  OPENROUTER_API_KEY no encontrada en variables de entorno")
+        print("💡 Para usar LLMs, exporta tu API key:")
+        print("   export OPENROUTER_API_KEY='tu-clave-aqui'")
+        print("   O usa --github-token para operaciones básicas de Git\n")
+    
+    main()
