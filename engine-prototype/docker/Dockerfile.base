@@ -1,0 +1,129 @@
+# docker/Dockerfile.base
+FROM ubuntu:22.04 AS tdh-base
+
+# Evitar prompts interactivos durante la instalación
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Configurar Python 3.11 como predeterminado
+RUN ln -fs /usr/share/zoneinfo/$TZ /etc/localtime
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    # Compiladores y herramientas de build
+    gcc \
+    g++ \
+    clang \
+    clang-tools \
+    make \
+    cmake \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    ninja-build \
+    # Herramientas de análisis estático (SAST)
+    cppcheck \
+    flawfinder \
+    # Herramientas de testing y depuración
+    valgrind \
+    gdb \
+    lldb \
+    ltrace \
+    strace \
+    # Lenguajes y entornos
+    python3.11 \
+    python3-pip \
+    python3.11-dev \
+    nodejs \
+    npm \
+    openjdk-17-jdk \
+    openjdk-17-jre \
+    # Herramientas de desarrollo
+    git \
+    curl \
+    wget \
+    vim \
+    nano \
+    tar \
+    unzip \
+    rsync \
+    # Bibliotecas comunes
+    libssl-dev \
+    libffi-dev \
+    zlib1g-dev \
+    libncurses5-dev \
+    libgdbm-dev \
+    libnss3-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libbz2-dev \
+    # Herramientas de red
+    net-tools \
+    iputils-ping \
+    # Para compilación C/C++
+    build-essential \
+    libc6-dev \
+    protobuf-compiler \
+    libprotobuf-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configurar Python 3.11 como predeterminado
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
+# Instalar herramientas SAST Python via pip
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
+# Instalar herramientas de análisis de seguridad
+RUN pip3 install --no-cache-dir \
+    bandit \
+    semgrep \
+    safety \
+    pylint \
+    flake8 \
+    mypy \
+    # Para análisis de dependencias
+    pip-audit \
+    # Para procesamiento de resultados
+    pandas \
+    numpy \
+    # SDK de Docker para Python
+    docker \
+    # Cliente de API
+    aiohttp \
+    asyncio
+
+# Instalar semgrep rules (opcional, semgrep las descarga al ejecutar)
+# Si se desea pre-descargar reglas para uso offline, se puede usar:
+# RUN semgrep scan --config auto --dry-run
+
+# Instalar herramientas adicionales de Node.js
+RUN npm install -g \
+    npm-audit \
+    eslint \
+    # Configurar npm para no preguntar
+    && npm config set yes true
+
+# Crear usuario no-root para mayor seguridad
+RUN useradd -m -s /bin/bash tdh-user && \
+    chown -R tdh-user:tdh-user /home/tdh-user
+
+# Crear directorio de trabajo
+RUN mkdir -p /workspace && \
+    chown -R tdh-user:tdh-user /workspace
+
+# Configurar entorno de usuario
+USER tdh-user
+WORKDIR /workspace
+
+# Variables de entorno
+ENV PATH="/home/tdh-user/.local/bin:${PATH}"
+ENV PYTHONPATH="/workspace"
+
+# Salud del contenedor
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python3 -c "import sys; sys.exit(0)"
+
+# Comando por defecto
+CMD ["/bin/bash"]

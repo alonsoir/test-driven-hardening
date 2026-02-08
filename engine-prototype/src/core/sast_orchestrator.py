@@ -1,317 +1,191 @@
-# src/core/sast_orchestrator.py
+# engine-prototype/src/core/sast_orchestrator.py
 """
-Orquestador SAST simplificado para pruebas.
+Orquestador SAST que integra Docker Manager y SAST Pipeline
 """
 
-import os
+import asyncio
 import json
-import subprocess
+import logging
+from typing import Dict, List, Optional, Any
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-import tempfile
 
+from .docker_manager import DockerManager
+from .sast_pipeline import SASTPipeline, SASTResult, Vulnerability
+
+logger = logging.getLogger(__name__)
 
 class SASTOrchestrator:
-    """Orquestador SAST simplificado."""
+    """Orquestador que coordina análisis SAST en contenedores Docker"""
     
-    def __init__(self, config_path: Optional[str] = None):
-        self.config_path = config_path
-        self.tools = self._load_tools_config()
-        
-    def _load_tools_config(self) -> Dict[str, Any]:
-        """Carga configuración de herramientas SAST."""
-        # Configuración por defecto
-        return {
-            "cppcheck": {
-                "enabled": True,
-                "command": "cppcheck",
-                "args": ["--enable=all", "--output-file=cppcheck.json", "--quiet"]
-            },
-            "bandit": {
-                "enabled": True,
-                "command": "bandit",
-                "args": ["-r", ".", "-f", "json", "-o", "bandit.json"]
-            }
-        }
+    def __init__(self):
+        self.docker_manager = DockerManager()
+        self.sast_pipeline = SASTPipeline()
+        self.results_dir = Path("results")
+        self.results_dir.mkdir(exist_ok=True)
     
-    async def analyze_repository(self, repo_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    async def analyze_repository(self, repo_url: str, llm_name: str = "claude-3-5") -> Dict[str, Any]:
         """
-        Analiza un repositorio con herramientas SAST.
+        Análisis completo: crear contenedor → ejecutar SAST → limpiar
         
         Args:
-            repo_path: Ruta del repositorio
-            output_dir: Directorio para resultados
-            
+            repo_url: URL del repositorio a analizar
+            llm_name: Nombre del LLM para el contenedor
+        
         Returns:
-            Resultados del análisis
+            Dict con resultados del análisis
         """
-        print(f"🔍 Analizando repositorio: {repo_path}")
-        
-        # Verificar si es URL o directorio local
-        if repo_path.startswith("http"):
-            # Clonar repositorio temporalmente
-            with tempfile.TemporaryDirectory() as tmpdir:
-                clone_dir = Path(tmpdir) / "repo"
-                self._clone_repository(repo_path, clone_dir)
-                return await self._analyze_directory(clone_dir, output_dir)
-        else:
-            # Es un directorio local
-            return await self._analyze_directory(Path(repo_path), output_dir)
-    
-    def _clone_repository(self, repo_url: str, target_dir: Path):
-        """Clona un repositorio Git."""
-        print(f"📦 Clonando {repo_url} a {target_dir}")
-        try:
-            subprocess.run(["git", "clone", repo_url, str(target_dir)], 
-                         check=True, capture_output=True)
-            print(f"✅ Repositorio clonado")
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Error clonando repositorio: {e}")
-            raise
-    
-    async def _analyze_directory(self, repo_dir: Path, output_dir: Optional[str]) -> Dict[str, Any]:
-        """Analiza un directorio con herramientas SAST."""
-        print(f"📁 Analizando directorio: {repo_dir}")
-        
-        # Cambiar al directorio del repositorio
-        original_dir = os.getcwd()
-        os.chdir(repo_dir)
-        
-        issues = []
+        logger.info(f"🚀 Iniciando análisis para {repo_url}")
         
         try:
-            # Ejecutar cppcheck para C/C++
-            if self.tools["cppcheck"]["enabled"]:
-                cpp_issues = self._run_cppcheck()
-                issues.extend(cpp_issues)
+            # 1. Crear contenedor aislado
+            logger.info(f"🐳 Creando contenedor para {llm_name}...")
+            container_config = await self.docker_manager.create_isolated_container(
+                llm_name, repo_url
+            )
             
-            # Ejecutar bandit para Python
-            if self.tools["bandit"]["enabled"]:
-                python_issues = self._run_bandit()
-                issues.extend(python_issues)
+            # 2. Ejecutar análisis SAST dentro del contenedor
+            logger.info("🔍 Ejecutando análisis SAST...")
+            sast_result = await self._run_sast_in_container(
+                container_config.container_name,
+                repo_url
+            )
             
-            # Buscar archivos vulnerables de ejemplo
-            example_issues = self._find_example_vulnerabilities(repo_dir)
-            issues.extend(example_issues)
+            # 3. Limpiar contenedor
+            logger.info("🧹 Limpiando contenedor...")
+            await self.docker_manager.cleanup_container(container_config.container_name)
             
-        finally:
-            # Volver al directorio original
-            os.chdir(original_dir)
+            # 4. Guardar resultados
+            output_dir = self.results_dir / f"analysis_{Path(repo_url).stem}"
+            await self.sast_pipeline.save_results(sast_result, str(output_dir))
+            
+            # 5. Preparar respuesta para LLM
+            llm_response = await self._prepare_llm_response(sast_result)
+            
+            return {
+                "success": True,
+                "container": container_config.container_name,
+                "sast_result": sast_result,
+                "llm_response": llm_response,
+                "output_dir": str(output_dir)
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error en análisis: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    async def _run_sast_in_container(self, container_name: str, repo_url: str) -> SASTResult:
+        """Ejecutar análisis SAST dentro de un contenedor Docker"""
+        # Obtener ruta del repositorio dentro del contenedor
+        repo_path = "/workspace/repo"
         
-        # Si no se encontraron issues, crear algunos de ejemplo
-        if not issues:
-            issues = self._create_example_issues()
+        # Ejecutar comandos de análisis
+        tools_to_run = [
+            ("cppcheck", f"cppcheck --enable=all --inconclusive {repo_path}"),
+            ("bandit", f"cd {repo_path} && bandit -r . -f json"),
+            ("semgrep", f"cd {repo_path} && semgrep --config auto --json")
+        ]
         
+        results = {}
+        for tool_name, command in tools_to_run:
+            try:
+                logger.info(f"🛠️  Ejecutando {tool_name}...")
+                result = await self.docker_manager.execute_command(
+                    container_name, command
+                )
+                results[tool_name] = result
+            except Exception as e:
+                logger.warning(f"⚠️  Error con {tool_name}: {e}")
+        
+        # Para esta versión, simulamos análisis directo en host
+        # (en producción se ejecutaría dentro del contenedor)
+        logger.info("📊 Analizando código localmente...")
+        
+        # Clonar repo localmente temporalmente
+        import tempfile
+        import subprocess
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # Clonar repositorio
+            subprocess.run(["git", "clone", repo_url, tmp_dir], 
+                         capture_output=True)
+            
+            # Ejecutar pipeline SAST
+            sast_result = await self.sast_pipeline.run_complete_analysis(tmp_dir)
+            
+            return sast_result
+    
+    async def _prepare_llm_response(self, sast_result: SASTResult) -> Dict[str, Any]:
+        """Preparar respuesta estructurada para LLM"""
+        # Filtrar vulnerabilidades críticas/altas
+        critical_vulns = [
+            v for v in sast_result.vulnerabilities 
+            if not v.false_positive and v.severity in ["critical", "high"]
+        ]
+        
+        # Agrupar por tipo
+        grouped_vulns = {}
+        for vuln in critical_vulns:
+            if vuln.cwe_id not in grouped_vulns:
+                grouped_vulns[vuln.cwe_id] = []
+            grouped_vulns[vuln.cwe_id].append(vuln)
+        
+        # Preparar contexto para LLM
         return {
-            "issues": issues,
             "summary": {
-                "total": len(issues),
-                "by_severity": self._count_by_severity(issues),
-                "by_tool": self._count_by_tool(issues)
+                "total_vulnerabilities": sast_result.total_vulnerabilities,
+                "critical_high": len(critical_vulns),
+                "by_severity": sast_result.by_severity,
+                "by_tool": sast_result.by_tool
             },
-            "repository": str(repo_dir),
-            "timestamp": self._get_timestamp()
+            "critical_vulnerabilities": [
+                {
+                    "cwe": vuln.cwe_id,
+                    "severity": vuln.severity,
+                    "file": vuln.file_path,
+                    "line": vuln.line_number,
+                    "description": vuln.message,
+                    "code_snippet": vuln.code_snippet,
+                    "fix_suggestion": vuln.fix_suggestion
+                }
+                for vuln in critical_vulns[:10]  # Limitar a 10 para contexto
+            ],
+            "recommended_actions": self._generate_recommendations(critical_vulns)
         }
     
-    def _run_cppcheck(self) -> List[Dict[str, Any]]:
-        """Ejecuta cppcheck."""
-        try:
-            # Simular ejecución de cppcheck
-            print("   🔧 Ejecutando cppcheck...")
-            
-            # Issues de ejemplo para C/C++
-            return [
-                {
-                    "tool": "cppcheck",
-                    "rule_id": "nullPointer",
-                    "severity": "CRITICAL",
-                    "confidence": "HIGH",
-                    "message": "Possible null pointer dereference",
-                    "file": "src/main.c",
-                    "line": 42,
-                    "cwe": "CWE-476",
-                    "owasp": "A9:2021-Security Logging and Monitoring Failures",
-                    "code_snippet": "    char *ptr = NULL;\n    *ptr = 'a';  // VULNERABLE"
-                },
-                {
-                    "tool": "cppcheck",
-                    "rule_id": "bufferAccessOutOfBounds",
-                    "severity": "HIGH",
-                    "confidence": "MEDIUM",
-                    "message": "Buffer access out of bounds",
-                    "file": "src/utils.c",
-                    "line": 123,
-                    "cwe": "CWE-119",
-                    "owasp": "A8:2021-Software and Data Integrity Failures",
-                    "code_snippet": "    char buffer[10];\n    buffer[15] = 'x';  // VULNERABLE"
-                }
-            ]
-        except Exception as e:
-            print(f"   ⚠️  Error en cppcheck: {e}")
-            return []
-    
-    def _run_bandit(self) -> List[Dict[str, Any]]:
-        """Ejecuta bandit para Python."""
-        try:
-            # Simular ejecución de bandit
-            print("   🐍 Ejecutando bandit...")
-            
-            # Issues de ejemplo para Python
-            return [
-                {
-                    "tool": "bandit",
-                    "rule_id": "B301",
-                    "severity": "MEDIUM",
-                    "confidence": "HIGH",
-                    "message": "Pickle module used, possible deserialization attack",
-                    "file": "api/deserialize.py",
-                    "line": 15,
-                    "cwe": "CWE-502",
-                    "owasp": "A8:2021-Software and Data Integrity Failures",
-                    "code_snippet": "import pickle\npickle.loads(user_input)  # VULNERABLE"
-                }
-            ]
-        except Exception as e:
-            print(f"   ⚠️  Error en bandit: {e}")
-            return []
-    
-    def _find_example_vulnerabilities(self, repo_dir: Path) -> List[Dict[str, Any]]:
-        """Busca vulnerabilidades de ejemplo en archivos conocidos."""
-        issues = []
+    def _generate_recommendations(self, vulnerabilities: List[Vulnerability]) -> List[str]:
+        """Generar recomendaciones basadas en vulnerabilidades"""
+        recommendations = []
         
-        # Buscar archivos C/C++
-        for c_file in repo_dir.rglob("*.c"):
-            issues.extend(self._analyze_c_file(c_file))
+        cwe_counts = {}
+        for vuln in vulnerabilities:
+            if vuln.cwe_id:
+                cwe_counts[vuln.cwe_id] = cwe_counts.get(vuln.cwe_id, 0) + 1
         
-        for cpp_file in repo_dir.rglob("*.cpp"):
-            issues.extend(self._analyze_cpp_file(cpp_file))
+        # Recomendaciones específicas por CWE
+        for cwe_id, count in sorted(cwe_counts.items(), key=lambda x: x[1], reverse=True):
+            if cwe_id == "CWE-78":
+                recommendations.append(
+                    f"Reemplazar {count} llamadas a system()/popen() con funciones seguras"
+                )
+            elif cwe_id == "CWE-120":
+                recommendations.append(
+                    f"Corregir {count} accesos fuera de límites en buffers/arrays"
+                )
+            elif cwe_id == "CWE-476":
+                recommendations.append(
+                    f"Agregar {count} verificaciones de punteros nulos"
+                )
         
-        # Buscar archivos Python
-        for py_file in repo_dir.rglob("*.py"):
-            issues.extend(self._analyze_python_file(py_file))
+        # Recomendaciones generales
+        if len(vulnerabilities) > 0:
+            recommendations.append(
+                "Implementar pruebas unitarias específicas para casos de borde"
+            )
+            recommendations.append(
+                "Revisar la gestión de memoria en funciones críticas"
+            )
         
-        return issues
-    
-    def _analyze_c_file(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Analiza archivo C en busca de vulnerabilidades comunes."""
-        try:
-            with open(file_path, 'r') as f:
-                content = f.read()
-            
-            issues = []
-            
-            # Buscar gets() - CRITICAL
-            if "gets(" in content:
-                issues.append({
-                    "tool": "manual",
-                    "rule_id": "CWE-242",
-                    "severity": "CRITICAL",
-                    "confidence": "HIGH",
-                    "message": "Use of gets() function, possible buffer overflow",
-                    "file": str(file_path.relative_to(Path.cwd())),
-                    "line": self._find_line(content, "gets("),
-                    "cwe": "CWE-242",
-                    "owasp": "A2:2021-Cryptographic Failures",
-                    "code_snippet": self._extract_snippet(content, "gets(")
-                })
-            
-            # Buscar strcpy() - HIGH
-            if "strcpy(" in content:
-                issues.append({
-                    "tool": "manual",
-                    "rule_id": "CWE-120",
-                    "severity": "HIGH",
-                    "confidence": "MEDIUM",
-                    "message": "Use of strcpy() without bounds checking",
-                    "file": str(file_path.relative_to(Path.cwd())),
-                    "line": self._find_line(content, "strcpy("),
-                    "cwe": "CWE-120",
-                    "owasp": "A2:2021-Cryptographic Failures",
-                    "code_snippet": self._extract_snippet(content, "strcpy(")
-                })
-            
-            return issues
-            
-        except Exception as e:
-            print(f"   ⚠️  Error analizando {file_path}: {e}")
-            return []
-    
-    def _analyze_cpp_file(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Analiza archivo C++ en busca de vulnerabilidades."""
-        # Similar a _analyze_c_file
-        return []
-    
-    def _analyze_python_file(self, file_path: Path) -> List[Dict[str, Any]]:
-        """Analiza archivo Python en busca de vulnerabilidades."""
-        # Similar a _analyze_c_file
-        return []
-    
-    def _create_example_issues(self) -> List[Dict[str, Any]]:
-        """Crea issues de ejemplo cuando no se encuentran reales."""
-        return [
-            {
-                "tool": "example",
-                "rule_id": "CWE-78",
-                "severity": "CRITICAL",
-                "confidence": "HIGH",
-                "message": "Possible command injection via system() call",
-                "file": "src/vulnerable.c",
-                "line": 42,
-                "cwe": "CWE-78",
-                "owasp": "A1:2021-Injection",
-                "code_snippet": "    system(user_input);  // VULNERABLE: command injection",
-                "more_info": "https://cwe.mitre.org/data/definitions/78.html"
-            },
-            {
-                "tool": "example",
-                "rule_id": "CWE-89",
-                "severity": "HIGH",
-                "confidence": "MEDIUM",
-                "message": "Possible SQL injection",
-                "file": "web/database.py",
-                "line": 78,
-                "cwe": "CWE-89",
-                "owasp": "A1:2021-Injection",
-                "code_snippet": "    query = f\"SELECT * FROM users WHERE name = '{username}'\"  # VULNERABLE",
-                "more_info": "https://cwe.mitre.org/data/definitions/89.html"
-            }
-        ]
-    
-    def _find_line(self, content: str, pattern: str) -> int:
-        """Encuentra la línea donde aparece un patrón."""
-        lines = content.split('\n')
-        for i, line in enumerate(lines, 1):
-            if pattern in line:
-                return i
-        return 0
-    
-    def _extract_snippet(self, content: str, pattern: str, lines_around: int = 3) -> str:
-        """Extrae un snippet de código alrededor de un patrón."""
-        lines = content.split('\n')
-        for i, line in enumerate(lines):
-            if pattern in line:
-                start = max(0, i - lines_around)
-                end = min(len(lines), i + lines_around + 1)
-                return '\n'.join(lines[start:end])
-        return ""
-    
-    def _count_by_severity(self, issues: List[Dict]) -> Dict[str, int]:
-        """Cuenta issues por severidad."""
-        counts = {}
-        for issue in issues:
-            sev = issue.get('severity', 'UNKNOWN')
-            counts[sev] = counts.get(sev, 0) + 1
-        return counts
-    
-    def _count_by_tool(self, issues: List[Dict]) -> Dict[str, int]:
-        """Cuenta issues por herramienta."""
-        counts = {}
-        for issue in issues:
-            tool = issue.get('tool', 'unknown')
-            counts[tool] = counts.get(tool, 0) + 1
-        return counts
-    
-    def _get_timestamp(self) -> str:
-        """Obtiene timestamp actual."""
-        from datetime import datetime
-        return datetime.now().isoformat()
+        return recommendations

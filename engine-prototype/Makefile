@@ -1,44 +1,42 @@
 # engine-prototype/Makefile
-.PHONY: help setup test clean check
+.PHONY: setup setup-deps build-base test clean check
 
-VENV = venv
-PYTHON = $(VENV)/bin/python
-PIP = $(VENV)/bin/pip
+setup: setup-deps
+	@echo "📁 Creando estructura de directorios..."
+	mkdir -p src/{core,llm_integration,sast_integration,utils}
+	mkdir -p docker config tests results
+	touch src/core/__init__.py src/llm_integration/__init__.py src/sast_integration/__init__.py src/utils/__init__.py
+	@echo "✅ Configuración completada."
 
-help:
-	@echo "🏗️  TDH Engine - Comandos disponibles:"
-	@echo ""
-	@echo "  make setup     - Configurar entorno virtual"
-	@echo "  make test      - Ejecutar pruebas del SAST Orchestrator"
-	@echo "  make check     - Verificar estructura del proyecto"
-	@echo "  make clean     - Limpiar archivos temporales"
-	@echo "  make run       - Ejecutar SAST en directorio actual"
-	@echo ""
-
-setup:
-	@echo "🔧 Configurando entorno virtual..."
-	python3 -m venv $(VENV)
-	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements.txt
-	@echo "✅ Entorno configurado. Ejecuta: source $(VENV)/bin/activate"
-
-test:
-	@echo "🧪 Ejecutando pruebas..."
-	$(PYTHON) scripts/test_sast.py .
-
-run:
-	@echo "🚀 Ejecutando SAST Orchestrator..."
-	$(PYTHON) -m src.core.sast_orchestrator .
+setup-deps:
+	@echo "🔧 Configurando entorno virtual y dependencias..."
+	@if [ ! -d "venv" ]; then \
+		python3.13 -m venv venv || python3.12 -m venv venv || python3 -m venv venv; \
+	fi
+	venv/bin/pip install --upgrade pip
+	venv/bin/pip install -r requirements.txt
+	@echo "✅ Dependencias instaladas."
 
 check:
-	@echo "🔍 Verificando estructura del proyecto..."
-	@bash scripts/check_structure.sh
+	@echo "🔍 Verificando dependencias..."
+	venv/bin/python check_deps.py
+
+build-base:
+	@echo "🐳 Construyendo imagen base Docker..."
+	docker build -f docker/Dockerfile.base -t tdh-base:latest .
+	@echo "✅ Imagen base construida."
+
+test:
+	@echo "🧪 Ejecutando prueba completa..."
+	venv/bin/python tdh_unified.py test
 
 clean:
-	@echo "🧹 Limpiando archivos temporales..."
-	find . -type f -name "*.pyc" -delete
-	find . -type d -name "__pycache__" -delete
-	find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
-	find . -type f -name "*.log" -delete
-	rm -rf reports/*.json reports/*.html
-	@echo "✅ Limpieza completada"
+	@echo "🧹 Limpiando..."
+	-venv/bin/python tdh_unified.py docker-cleanup 2>/dev/null || true
+	-rm -rf results/* test-results/*
+	@echo "✅ Limpieza completada."
+
+# Comando rápido para instalar solo aiofiles
+install-aiofiles:
+	venv/bin/pip install aiofiles>=23.2.0
+	@echo "✅ aiofiles instalado."

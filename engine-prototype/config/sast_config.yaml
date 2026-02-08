@@ -1,0 +1,110 @@
+# config/sast_config.yaml
+tools:
+  cppcheck:
+    enabled: true
+    command: "cppcheck"
+    args:
+      - "--enable=all"
+      - "--inconclusive"
+      - "--suppress=missingIncludeSystem"
+      - "--suppress=unmatchedSuppression"
+      - "--xml"
+      - "--xml-version=2"
+      - "--output-file={output_file}"
+      - "--platform=unix64"
+      - "--std=c++11"
+      - "--std=c99"
+    timeout: 600  # 10 minutos para proyectos grandes
+    max_file_size: 10485760  # 10MB
+    
+  flawfinder:
+    enabled: true
+    command: "flawfinder"
+    args:
+      - "--quiet"
+      - "--dataonly"
+      - "--csv"
+      - "--context"
+    timeout: 300
+    min_level: 1  # Nivel mínimo de riesgo
+    
+  bandit:
+    enabled: true
+    command: "bandit"
+    args:
+      - "-r"
+      - "-f"
+      - "json"
+      - "-o"
+      - "{output_file}"
+      - "-lll"  # Solo errores y advertencias
+    timeout: 180
+    skips: ["B101"]  # Saltar asserts en test
+    
+  semgrep:
+    enabled: true
+    command: "semgrep"
+    args:
+      - "--config"
+      - "auto"
+      - "--json"
+      - "-o"
+      - "{output_file}"
+      - "--metrics"
+      - "off"
+      - "--no-rewrite-rule-ids"
+    timeout: 300
+    configs:
+      - "p/security-audit"
+      - "p/owasp-top-ten"
+
+severity_mapping:
+  critical: ["CRITICAL", "HIGH"]
+  high: ["HIGH", "MEDIUM"]
+  medium: ["MEDIUM", "LOW"]
+  low: ["LOW", "INFO"]
+
+output:
+  formats: ["json", "sarif", "html"]
+  directory: "./reports"
+  include_code_snippets: true
+  max_snippet_lines: 5
+
+filtering:
+  exclude_patterns:
+    - "**/test_*.py"
+    - "**/*_test.py"
+    - "**/test/*"
+    - "**/tests/*"
+    - "**/vendor/*"
+    - "**/node_modules/*"
+    - "**/.git/*"
+    - "**/build/*"
+    - "**/protobuf/*"  # Excluir archivos generados
+    - "**/*.pb.h"      # Excluir headers de protobuf
+    - "**/*.pb.cc"     # Excluir código generado protobuf
+
+  false_positive_patterns:
+    cppcheck:
+      - pattern: "missingInclude"
+        reason: "System includes o includes de terceros"
+      - pattern: "unusedFunction" 
+        reason: "Común en código de biblioteca"
+      - pattern: "syntaxError"
+        reason: "Puede ser código generado o falso positivo"
+      - pattern: "preprocessorErrorDirective"
+        reason: "Archivos generados por protoc"
+    
+    flawfinder:
+      - pattern: "strcpy"
+        reason: "Puede ser uso seguro en contexto controlado"
+      - pattern: "sprintf"
+        reason: "Común en código legado"
+        
+  min_confidence: "MEDIUM"
+  max_false_positives: 10
+
+reporting:
+  generate_summary: true
+  include_metadata: true
+  timestamp_format: "%Y-%m-%d %H:%M:%S"

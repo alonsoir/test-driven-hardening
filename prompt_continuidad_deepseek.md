@@ -1,204 +1,243 @@
-# 🤖 **PROMPT DE CONTINUIDAD - TDH ENGINE**
+# 🤖 **PROMPT DE CONTINUIDAD - TDH ENGINE (VAGRANT EDITION)**
 
 ## 📋 **CONTEXTO DE SESIÓN ANTERIOR:**
-**Fecha:** Viernes 6 de febrero, primera hora de la mañana  
-**Tema:** Diseño de arquitectura completa del TDH Engine  
-**Estado:** Prototipo mockeado, plan de implementación definido  
-**Próximo paso:** Implementación real de infraestructura Docker + SAST pipeline
+**Fecha:** Sábado 8 de febrero, tarde frustrante  
+**Tema:** Batalla épica contra Docker Desktop en macOS  
+**Estado:** Docker Desktop 4.59.1 demostró ser software basura  
+**Decisión histórica:** **NUNCA JAMÁS** usar Docker Desktop en macOS para desarrollo serio
+
+## ⚠️ **LECCIÓN APRENDIDA (A SANGRE Y FUEGO):**
+> "Docker Desktop en macOS es como construir un rascacielos sobre arena movediza. Nunca más."
 
 ## 🎯 **OBJETIVO DE LA PRÓXIMA SESIÓN:**
-Implementar la **infraestructura Docker completa** y el **pipeline SAST real** para transicionar del prototipo mockeado al sistema de producción.
+Migrar TODO el desarrollo del TDH Engine a un **entorno Vagrant Ubuntu 22.04** con Docker nativo (el de verdad, no la porquería de Docker Desktop).
 
 ---
 
 ## 🔧 **TAREAS CONCRETAS PARA COMENZAR:**
 
-### **1. Crear Dockerfile base con todas las herramientas necesarias:**
-```dockerfile
-# Dockerfile.base
-FROM ubuntu:22.04
-# Incluir:
-# - Compiladores: gcc, g++, clang, make, cmake
-# - Herramientas SAST: cppcheck, flawfinder, bandit, semgrep
-# - Herramientas de testing: valgrind, gdb, python3-pip
-# - Entornos: Python 3.11, Node.js 18+, Java 17
-# - Git y herramientas de desarrollo
+### **1. Crear estructura Vagrant limpia:**
+```
+engine-prototype/
+├── vagrant/               # ← NUEVO: Todo lo de Vagrant
+│   ├── Vagrantfile       # Configuración de la VM
+│   └── provision/
+│       ├── 01-base.sh    # Sistema base
+│       ├── 02-docker.sh  # Docker NATIVO en Linux
+│       ├── 03-tools.sh   # Herramientas SAST
+│       └── 04-tdh.sh     # TDH Engine
+└── (el resto igual)
 ```
 
-### **2. Implementar docker_manager.py con funcionalidades reales:**
-```python
-class DockerManager:
-    def create_isolated_container(self, llm_name, repo_url):
-        # 1. Crear contenedor desde imagen base
-        # 2. Montar volumen con worktree
-        # 3. Clonar repositorio dentro del contenedor
-        # 4. Instalar dependencias específicas del proyecto
-        # 5. Configurar red para comunicación LLM
-        pass
+### **2. Vagrantfile minimalista pero potente:**
+```ruby
+Vagrant.configure("2") do |config|
+  # Ubuntu 22.04 LTS - ESTABLE como una roca
+  config.vm.box = "ubuntu/jammy64"
+  
+  # Recursos para análisis pesados
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "8192"    # 8GB RAM - para LLMs
+    vb.cpus = "4"         # 4 CPUs - para builds paralelos
+  end
+  
+  # Sincronización de código (bidireccional, en vivo)
+  config.vm.synced_folder "../", "/tdh-engine",
+    type: "rsync",
+    rsync__auto: true,
+    rsync__args: ["--verbose", "--archive", "--delete", "-z"]
+  
+  # Provisionamiento en orden
+  config.vm.provision "shell", path: "provision/01-base.sh"
+  config.vm.provision "shell", path: "provision/02-docker.sh", privileged: true
+  config.vm.provision "shell", path: "provision/03-tools.sh"
+  config.vm.provision "shell", path: "provision/04-tdh.sh", privileged: false
+end
 ```
 
-### **3. Implementar SAST pipeline con herramientas reales:**
-```python
-class SASTPipeline:
-    async def run_cppcheck_real(self, repo_path):
-        # Ejecutar cppcheck real con parámetros profesionales
-        # Parsear resultados en formato estructurado
-        # Filtrar falsos positivos inteligentemente
-        pass
+### **3. Script de Docker NATIVO (el bueno):**
+```bash
+#!/bin/bash
+# provision/02-docker.sh
+echo "🐳 INSTALANDO DOCKER NATIVO EN LINUX (como Dios manda)"
+
+# Método oficial - funciona SIEMPRE
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Sin Docker Desktop, sin problemas de socket, sin mierda de http+docker
+sudo usermod -aG docker vagrant
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Verificación
+echo "✅ Docker version: $(docker --version)"
+echo "✅ Docker info: $(docker info --format '{{.ServerVersion}}')"
+echo "✅ Docker socket: /var/run/docker.sock (PERMISOS CORRECTOS)"
 ```
 
 ---
 
 ## 📊 **CRITERIOS DE ÉXITO PARA ESTA SESIÓN:**
 
-### **✅ Objetivos mínimos (4 horas):**
-- [ ] `Dockerfile.base` creado y construido exitosamente
-- [ ] `docker_manager.py` puede crear y destruir contenedores
-- [ ] Pipeline SAST ejecuta cppcheck real en repositorio de prueba
-- [ ] Resultados SAST se parsean a formato estructurado JSON
+### **✅ Objetivos mínimos (2 horas):**
+- [ ] `vagrant up` completa sin errores
+- [ ] VM Ubuntu 22.04 funcionando
+- [ ] Docker nativo instalado y corriendo
+- [ ] Sincronización de carpetas funcionando
 
-### **🟡 Objetivos medios (8 horas):**
-- [ ] Contenedores aislados con worktrees funcionales
-- [ ] 3+ herramientas SAST integradas (cppcheck, bandit, semgrep)
-- [ ] Sistema de filtrado de falsos positivos básico
-- [ ] Vulnerabilidades priorizadas por severidad/confianza
+### **🟡 Objetivos medios (4 horas):**
+- [ ] TDH Engine instalado dentro de la VM
+- [ ] Imagen `tdh-base:latest` construida dentro de la VM
+- [ ] Análisis SAST funcionando en repositorio de prueba
+- [ ] Contenedores Docker creándose sin errores
 
-### **🟢 Objetivos completos (12+ horas):**
-- [ ] Red Docker para comunicación entre LLMs
-- [ ] Pipeline SAST completo con 5+ herramientas
-- [ ] Integración con Docker Manager (SAST → contenedores)
-- [ ] Prueba end-to-end con repositorio real
+### **🟢 Objetivos completos (6+ horas):**
+- [ ] Pipeline completo TDH funcionando 100% en VM
+- [ ] Comandos `make` adaptados para usar VM
+- [ ] Documentación para desarrollo en Vagrant
+- [ ] Prueba end-to-end exitosa
 
 ---
 
-## 🔗 **ARCHIVOS A CREAR/MODIFICAR:**
+## 🔗 **ARCHIVOS A CREAR:**
 
 ### **Nuevos:**
 ```
-docker/Dockerfile.base
-docker/docker_manager.py
-sast/sast_pipeline.py
-sast/cppcheck_analyzer.py
-sast/bandit_analyzer.py
-config/docker_config.yaml
+vagrant/Vagrantfile
+vagrant/provision/01-base.sh
+vagrant/provision/02-docker.sh
+vagrant/provision/03-tools.sh
+vagrant/provision/04-tdh.sh
+vagrant/README-VAGRANT.md
 ```
 
 ### **Modificar:**
 ```
-tdh_unified.py (actualizar comandos para usar Docker real)
-src/core/sast_orchestrator.py (reemplazar con implementación real)
-requirements.txt (añadir docker, aiohttp, etc.)
+Makefile (añadir comandos vagrant-*)
+README.md (añadir sección de desarrollo con Vagrant)
+tdh_unified.py (posiblemente nada, debería funcionar igual)
 ```
 
 ---
 
 ## 🚨 **PUNTOS DE ATENCIÓN CRÍTICOS:**
 
-### **1. Gestión de recursos Docker:**
-- Limpieza automática de contenedores
-- Límites de CPU/memoria por contenedor
-- Logging centralizado
+### **1. Sincronización de carpetas:**
+- RSync para cambios en caliente
+- Excluir venv/, __pycache__/, etc.
+- Mantener permisos correctos
 
-### **2. Parseo de resultados SAST:**
-- Normalización de formatos diferentes (cppcheck vs bandit vs semgrep)
-- Mapeo a CWEs/OWASP Top 10
-- Extracción de contexto de código
+### **2. Recursos de la VM:**
+- Suficiente RAM para análisis SAST pesados
+- CPUs para builds paralelos
+- Swap adecuado si es necesario
 
-### **3. Preparación de entornos:**
-- Detección automática de lenguajes del proyecto
-- Instalación inteligente de dependencias
-- Configuración de herramientas de build
+### **3. Networking:**
+- Forward de puertos si necesitamos API
+- Acceso a internet para descargas
+- Comunicación entre contenedores dentro de la VM
 
 ---
 
-## 📝 **PROMPT DE INICIO PARA DEEPSEEK:**
+## 📝 **PROMPT DE INICIO PARA DEEPSEEK (MAÑANA):**
 
-"Basándonos en la discusión del viernes sobre la arquitectura completa del TDH Engine, comenzamos la implementación real. 
+"Después de la experiencia traumática con Docker Desktop en macOS, hemos tomado la decisión sabia y profesional de migrar TODO el desarrollo del TDH Engine a un entorno Vagrant con Ubuntu 22.04 y Docker nativo.
 
-**Contexto actual:** Tenemos un prototipo mockeado con `tdh_unified.py` funcionando básicamente, pero sin Docker real, sin SAST real, y sin LLMs reales. 
+**Contexto actual:** Tenemos un TDH Engine funcional pero atrapado en el infierno de Docker Desktop. Docker funciona en terminal pero el SDK de Python falla con `http+docker`.
 
-**Objetivo inmediato:** Implementar la infraestructura Docker completa y el pipeline SAST real para analizar vulnerabilidades críticas en repositorios C/C++.
+**Objetivo inmediato:** Crear un entorno Vagrant 100% estable con:
+1. Ubuntu 22.04 LTS
+2. Docker nativo (apt install docker.io)
+3. Python 3.11
+4. Todas las herramientas SAST
+5. Sincronización bidireccional con el host
 
 **Tarea concreta:** 
-1. Crear `docker/Dockerfile.base` con todas las herramientas de desarrollo y seguridad necesarias
-2. Implementar `docker/docker_manager.py` que pueda:
-   - Crear contenedores aislados por LLM
-   - Clonar repositorios dentro del contenedor
-   - Ejecutar comandos en el contenedor
-   - Gestionar volúmenes para worktrees
-3. Implementar `sast/sast_pipeline.py` que ejecute:
-   - **cppcheck** real con configuración profesional
-   - **bandit** para Python si existe
-   - **semgrep** con reglas de seguridad
-   - Parsear resultados a formato JSON normalizado
+1. Crear `vagrant/Vagrantfile` con configuración robusta
+2. Crear scripts de provisionamiento que instalen Docker **NATIVO** (no Docker Desktop)
+3. Configurar sincronización RSync para desarrollo en caliente
+4. Adaptar los comandos `make` para trabajar con la VM
 
 **Requisitos específicos:**
-- Los contenedores deben estar completamente aislados
-- El análisis SAST debe identificar vulnerabilidades reales (no mock)
-- Los resultados deben incluir: archivo, línea, severidad, CWE, código vulnerable
-- El sistema debe funcionar con el repositorio de prueba: `https://github.com/alonsoir/test-zeromq-c-.git`
+- Docker debe funcionar con `docker.from_env()` sin errores
+- El socket `/var/run/docker.sock` debe tener permisos correctos
+- La VM debe tener recursos suficientes (8GB RAM, 4 CPUs)
+- Los cambios en host deben reflejarse automáticamente en guest
 
 **Preguntas para guiar la implementación:**
-1. ¿Qué herramientas específicas deben incluirse en el Dockerfile base?
-2. ¿Cómo estructurar los resultados SAST para que sean útiles para los LLMs?
-3. ¿Cómo manejar proyectos con múltiples lenguajes (C, C++, Python, etc.)?
-4. ¿Qué sistema de logging implementar para depuración?
+1. ¿RSync o NFS para sincronización? (RSync es más simple)
+2. ¿Instalar Docker via `get.docker.com` o `apt install docker.io`?
+3. ¿Cómo manejar el entorno virtual Python dentro de la VM?
+4. ¿Qué puertos forwardear para debugging?
 
-**Comencemos creando el Dockerfile.base con las herramientas esenciales para análisis de seguridad en C/C++.**"
+**Comenzamos creando la estructura Vagrant y el primer script de provisionamiento base.**
+
+**RECORDATORIO SACRO:** Esto es una migración **DE FUGA** de Docker Desktop. Jamás volveremos a esa basura."
 
 ---
 
 ## 🎪 **EJEMPLO DE FLUJO ESPERADO AL FINAL DE LA SESIÓN:**
 
 ```bash
-# 1. Construir imagen base
-docker build -f docker/Dockerfile.base -t tdh-base:latest .
+# DESDE EL HOST (macOS):
+cd engine-prototype/vagrant
 
-# 2. Ejecutar análisis SAST real
-python tdh_unified.py sast-real https://github.com/alonsoir/test-zeromq-c-.git --output ./results
+# Levantar la VM (primera vez)
+vagrant up
+
+# Conectar
+vagrant ssh
+
+# DENTRO DE LA VM (Ubuntu 22.04):
+cd /tdh-engine
+
+# Todo funciona PERFECTO:
+source venv/bin/activate
+docker ps  # ← FUNCIONA
+python -c "import docker; print(docker.from_env().ping())"  # ← DEVUELVE True
+
+# Ejecutar TDH Engine:
+python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git
 
 # Debería mostrar:
-# 🔍 Ejecutando cppcheck...
-# 🔍 Ejecutando bandit...
-# 🔍 Ejecutando semgrep...
-# ✅ Encontradas 8 vulnerabilidades CRITICAL
-# 💾 Resultados guardados en ./results/sast_results.json
-
-# 3. Crear contenedor para LLM
-python tdh_unified.py docker-prepare --llm claude-3-5 --repo https://github.com/alonsoir/test-zeromq-c-.git
-
-# Debería mostrar:
-# 🐳 Creando contenedor para claude-3-5...
-# 📦 Clonando repositorio en contenedor...
-# ⚙️ Instalando dependencias...
-# ✅ Contenedor listo: tdh-claude-3-5-abc123
+# ✅ Contenedor creado
+# ✅ Análisis SAST completado
+# ✅ Resultados guardados
 ```
 
 ---
 
 ## 📞 **PUNTOS DE DECISIÓN PARA CONSULTA:**
 
-### **Decisiones de arquitectura necesarias:**
-1. ¿Usar Docker Compose o Docker SDK for Python?
-2. ¿Estructura de volúmenes: named volumes o bind mounts?
-3. ¿Sistema de comunicación entre contenedores: Redis, RabbitMQ, o sockets Docker?
-4. ¿Formato de resultados SAST: SARIF, JSON personalizado, o ambos?
+### **Decisiones de arquitectura Vagrant:**
+1. ¿Box: `ubuntu/jammy64` oficial o `bento/ubuntu-22.04`?
+2. ¿Sincronización: RSync (más simple) o NFS (más rápido)?
+3. ¿Networking: NAT (más seguro) o bridge (más accesible)?
+4. ¿Provisionamiento: shell scripts o Ansible?
 
-### **Decisiones de configuración:**
-1. ¿Qué reglas de cppcheck habilitar/deshabilitar?
-2. ¿Qué configuraciones de semgrep usar (auto, security, etc.)?
-3. ¿Cómo manejar proyectos con sistemas de build complejos (CMake, Makefile, Autotools)?
+### **Decisiones de configuración Docker:**
+1. ¿Instalar Docker Compose V1 o V2?
+2. ¿Configurar Docker para usar overlay2 driver?
+3. ¿Añadir registry mirror para acelerar descargas?
+4. ¿Configurar límites de recursos Docker dentro de la VM?
 
 ---
 
-## 🎯 **METRICA DE PROGRESO FINAL:**
+## 🎯 **MÉTRICA DE PROGRESO FINAL:**
 
 Al final de esta sesión, deberíamos poder responder **SÍ** a:
-- [ ] ¿Puede el TDH Engine analizar un repositorio C/C++ real y encontrar vulnerabilidades reales?
-- [ ] ¿Puede crear contenedores Docker aislados con el código del repositorio?
-- [ ] ¿Los resultados del análisis son estructurados y listos para enviar a LLMs?
-- [ ] ¿El sistema es reproducible y escalable?
+- [ ] ¿Puedo hacer `vagrant up` y tener un entorno funcional en 15 mins?
+- [ ] ¿Docker funciona NATIVAMENTE sin errores de socket?
+- [ ] ¿El TDH Engine ejecuta análisis completos dentro de la VM?
+- [ ] ¿Puedo desarrollar en macOS y ejecutar en Linux sin dolor?
 
 ---
 
-**¿Comenzamos con la implementación del Dockerfile base y la integración de cppcheck real?** Este es el fundamento sobre el cual construiremos todo el sistema de hardening test-driven. 🚀
+## ⚠️ **JURAMENTO DE DESARROLLADOR:**
+
+> "Juro solemnemente jamás volver a intentar usar Docker Desktop en macOS para desarrollo profesional. Acepto que Vagrant/VirtualBox/Linux-native-Docker es el camino correcto, verdadero y sensato."
+
+---
+
+**¿Mañana comenzamos con la migración a Vagrant?** Esta vez será diferente. Esta vez funcionará. 🚀💪

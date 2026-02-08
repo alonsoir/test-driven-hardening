@@ -1,6 +1,17 @@
-# src/core/__init__.py
+# engine-prototype/src/core/__init__.py
 """
-Módulos core del TDH Engine.
+Módulo core del TDH Engine
 """
 
-# Esto hace que el directorio sea un paquete Python
+from .docker_manager import DockerManager, ContainerConfig
+from .sast_pipeline import SASTPipeline, SASTResult, Vulnerability
+from .sast_orchestrator import SASTOrchestrator
+
+__all__ = [
+    'DockerManager',
+    'ContainerConfig',
+    'SASTPipeline',
+    'SASTResult',
+    'Vulnerability',
+    'SASTOrchestrator'
+]
