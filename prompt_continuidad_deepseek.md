@@ -1,243 +1,294 @@
-# 🤖 **PROMPT DE CONTINUIDAD - TDH ENGINE (VAGRANT EDITION)**
+# 🤖 **PROMPT DE CONTINUIDAD - TDH ENGINE (DÍA 2 - LA PRUEBA DEFINITIVA)**
 
 ## 📋 **CONTEXTO DE SESIÓN ANTERIOR:**
-**Fecha:** Sábado 8 de febrero, tarde frustrante  
-**Tema:** Batalla épica contra Docker Desktop en macOS  
-**Estado:** Docker Desktop 4.59.1 demostró ser software basura  
-**Decisión histórica:** **NUNCA JAMÁS** usar Docker Desktop en macOS para desarrollo serio
+**Fecha:** Domingo 9 de febrero, éxitos parciales  
+**Tema:** Gran migración a Vagrant - ¡Docker Desktop eliminado!  
+**Estado:** 
+- ✅ VM Vagrant configurada con Ubuntu 22.04 LTS
+- ✅ Docker nativo funcionando (el de verdad)
+- ✅ Docker SDK de Python conectando correctamente
+- ✅ Imagen `tdh-base:latest` localizada en `docker/Dockerfile.base`
+- ✅ Makefile adaptado para entorno Vagrant/host
+- ❌ Imagen `tdh-base` aún no construida (pendiente)
 
-## ⚠️ **LECCIÓN APRENDIDA (A SANGRE Y FUEGO):**
-> "Docker Desktop en macOS es como construir un rascacielos sobre arena movediza. Nunca más."
+**Momento clave:** Docker Desktop es ahora un recuerdo traumático del pasado
 
-## 🎯 **OBJETIVO DE LA PRÓXIMA SESIÓN:**
-Migrar TODO el desarrollo del TDH Engine a un **entorno Vagrant Ubuntu 22.04** con Docker nativo (el de verdad, no la porquería de Docker Desktop).
+## 🎯 **OBJETIVO DE HOY: LA PRUEBA DEFINITIVA DEL TDH ENGINE**
 
----
+**Meta final:** Verificar que el TDH Engine completo funciona en el nuevo entorno Vagrant, incluyendo todas las capacidades orquestadas.
 
-## 🔧 **TAREAS CONCRETAS PARA COMENZAR:**
+## 🔬 **PLAN DE PRUEBAS POR FASES:**
 
-### **1. Crear estructura Vagrant limpia:**
-```
-engine-prototype/
-├── vagrant/               # ← NUEVO: Todo lo de Vagrant
-│   ├── Vagrantfile       # Configuración de la VM
-│   └── provision/
-│       ├── 01-base.sh    # Sistema base
-│       ├── 02-docker.sh  # Docker NATIVO en Linux
-│       ├── 03-tools.sh   # Herramientas SAST
-│       └── 04-tdh.sh     # TDH Engine
-└── (el resto igual)
-```
-
-### **2. Vagrantfile minimalista pero potente:**
-```ruby
-Vagrant.configure("2") do |config|
-  # Ubuntu 22.04 LTS - ESTABLE como una roca
-  config.vm.box = "ubuntu/jammy64"
-  
-  # Recursos para análisis pesados
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "8192"    # 8GB RAM - para LLMs
-    vb.cpus = "4"         # 4 CPUs - para builds paralelos
-  end
-  
-  # Sincronización de código (bidireccional, en vivo)
-  config.vm.synced_folder "../", "/tdh-engine",
-    type: "rsync",
-    rsync__auto: true,
-    rsync__args: ["--verbose", "--archive", "--delete", "-z"]
-  
-  # Provisionamiento en orden
-  config.vm.provision "shell", path: "provision/01-base.sh"
-  config.vm.provision "shell", path: "provision/02-docker.sh", privileged: true
-  config.vm.provision "shell", path: "provision/03-tools.sh"
-  config.vm.provision "shell", path: "provision/04-tdh.sh", privileged: false
-end
-```
-
-### **3. Script de Docker NATIVO (el bueno):**
+### **FASE 1: ARRANQUE Y VERIFICACIÓN (30 min)**
 ```bash
-#!/bin/bash
-# provision/02-docker.sh
-echo "🐳 INSTALANDO DOCKER NATIVO EN LINUX (como Dios manda)"
+# Desde macOS
+cd engine-prototype
+make vagrant-up          # Ver que todo carga
+make vagrant-ssh         # Conectar
 
-# Método oficial - funciona SIEMPRE
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# Sin Docker Desktop, sin problemas de socket, sin mierda de http+docker
-sudo usermod -aG docker vagrant
-sudo systemctl enable docker
-sudo systemctl start docker
-
-# Verificación
-echo "✅ Docker version: $(docker --version)"
-echo "✅ Docker info: $(docker info --format '{{.ServerVersion}}')"
-echo "✅ Docker socket: /var/run/docker.sock (PERMISOS CORRECTOS)"
+# Dentro de VM
+cd /home/vagrant/tdh-engine
+make env-info           # Verificar entorno
+make docker-info        # Verificar Docker
+make list-tools         # Verificar herramientas SAST
+docker images           # Verificar imagen tdh-base
 ```
 
----
-
-## 📊 **CRITERIOS DE ÉXITO PARA ESTA SESIÓN:**
-
-### **✅ Objetivos mínimos (2 horas):**
-- [ ] `vagrant up` completa sin errores
-- [ ] VM Ubuntu 22.04 funcionando
-- [ ] Docker nativo instalado y corriendo
-- [ ] Sincronización de carpetas funcionando
-
-### **🟡 Objetivos medios (4 horas):**
-- [ ] TDH Engine instalado dentro de la VM
-- [ ] Imagen `tdh-base:latest` construida dentro de la VM
-- [ ] Análisis SAST funcionando en repositorio de prueba
-- [ ] Contenedores Docker creándose sin errores
-
-### **🟢 Objetivos completos (6+ horas):**
-- [ ] Pipeline completo TDH funcionando 100% en VM
-- [ ] Comandos `make` adaptados para usar VM
-- [ ] Documentación para desarrollo en Vagrant
-- [ ] Prueba end-to-end exitosa
-
----
-
-## 🔗 **ARCHIVOS A CREAR:**
-
-### **Nuevos:**
-```
-vagrant/Vagrantfile
-vagrant/provision/01-base.sh
-vagrant/provision/02-docker.sh
-vagrant/provision/03-tools.sh
-vagrant/provision/04-tdh.sh
-vagrant/README-VAGRANT.md
-```
-
-### **Modificar:**
-```
-Makefile (añadir comandos vagrant-*)
-README.md (añadir sección de desarrollo con Vagrant)
-tdh_unified.py (posiblemente nada, debería funcionar igual)
-```
-
----
-
-## 🚨 **PUNTOS DE ATENCIÓN CRÍTICOS:**
-
-### **1. Sincronización de carpetas:**
-- RSync para cambios en caliente
-- Excluir venv/, __pycache__/, etc.
-- Mantener permisos correctos
-
-### **2. Recursos de la VM:**
-- Suficiente RAM para análisis SAST pesados
-- CPUs para builds paralelos
-- Swap adecuado si es necesario
-
-### **3. Networking:**
-- Forward de puertos si necesitamos API
-- Acceso a internet para descargas
-- Comunicación entre contenedores dentro de la VM
-
----
-
-## 📝 **PROMPT DE INICIO PARA DEEPSEEK (MAÑANA):**
-
-"Después de la experiencia traumática con Docker Desktop en macOS, hemos tomado la decisión sabia y profesional de migrar TODO el desarrollo del TDH Engine a un entorno Vagrant con Ubuntu 22.04 y Docker nativo.
-
-**Contexto actual:** Tenemos un TDH Engine funcional pero atrapado en el infierno de Docker Desktop. Docker funciona en terminal pero el SDK de Python falla con `http+docker`.
-
-**Objetivo inmediato:** Crear un entorno Vagrant 100% estable con:
-1. Ubuntu 22.04 LTS
-2. Docker nativo (apt install docker.io)
-3. Python 3.11
-4. Todas las herramientas SAST
-5. Sincronización bidireccional con el host
-
-**Tarea concreta:** 
-1. Crear `vagrant/Vagrantfile` con configuración robusta
-2. Crear scripts de provisionamiento que instalen Docker **NATIVO** (no Docker Desktop)
-3. Configurar sincronización RSync para desarrollo en caliente
-4. Adaptar los comandos `make` para trabajar con la VM
-
-**Requisitos específicos:**
-- Docker debe funcionar con `docker.from_env()` sin errores
-- El socket `/var/run/docker.sock` debe tener permisos correctos
-- La VM debe tener recursos suficientes (8GB RAM, 4 CPUs)
-- Los cambios en host deben reflejarse automáticamente en guest
-
-**Preguntas para guiar la implementación:**
-1. ¿RSync o NFS para sincronización? (RSync es más simple)
-2. ¿Instalar Docker via `get.docker.com` o `apt install docker.io`?
-3. ¿Cómo manejar el entorno virtual Python dentro de la VM?
-4. ¿Qué puertos forwardear para debugging?
-
-**Comenzamos creando la estructura Vagrant y el primer script de provisionamiento base.**
-
-**RECORDATORIO SACRO:** Esto es una migración **DE FUGA** de Docker Desktop. Jamás volveremos a esa basura."
-
----
-
-## 🎪 **EJEMPLO DE FLUJO ESPERADO AL FINAL DE LA SESIÓN:**
-
+### **FASE 2: CONSTRUCCIÓN DE IMAGEN BASE (15 min)**
 ```bash
-# DESDE EL HOST (macOS):
-cd engine-prototype/vagrant
+# Si falta la imagen:
+make build-base
 
-# Levantar la VM (primera vez)
-vagrant up
+# Verificar construcción
+docker run --rm tdh-base:latest semgrep --version
+docker run --rm tdh-base:latest bandit --version
+```
 
-# Conectar
-vagrant ssh
+### **FASE 3: PRUEBA BÁSICA DEL ENGINE (1 hora)**
+```bash
+# Ejecutar el ejemplo completo
+make vm-example
 
-# DENTRO DE LA VM (Ubuntu 22.04):
-cd /tdh-engine
-
-# Todo funciona PERFECTO:
+# O manualmente:
 source venv/bin/activate
-docker ps  # ← FUNCIONA
-python -c "import docker; print(docker.from_env().ping())"  # ← DEVUELVE True
-
-# Ejecutar TDH Engine:
 python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git
-
-# Debería mostrar:
-# ✅ Contenedor creado
-# ✅ Análisis SAST completado
-# ✅ Resultados guardados
 ```
 
----
+**Verificar que:**
+- ✅ El engine se conecta a Docker
+- ✅ Clona el repositorio de prueba
+- ✅ Crea contenedores para cada SOTA
+- ✅ Asigna worktrees a miembros del consejo
+- ✅ Ejecuta análisis SAST/AST
+- ✅ Asigna resultados a los SOTA
 
-## 📞 **PUNTOS DE DECISIÓN PARA CONSULTA:**
+### **FASE 4: PRUEBA DEL FLUJO COMPLETO (2-3 horas)**
+**Etapas a verificar por cada SOTA:**
+1. **Análisis de problema crítico** - ¿Identifican vulnerabilidades?
+2. **Test de demostración de criticidad** - ¿Crean PoC del problema?
+3. **Producción del fix** - ¿Generan solución?
+4. **Compilación del fix** - ¿Compila correctamente?
+5. **Ejecución del fix** - ¿Funciona el código corregido?
+6. **Test de verificación** - ¿Pasa las pruebas?
+7. **Documentación** - ¿Generan documentación del cambio?
+8. **Comunicación entre SOTA** - ¿Colaboran entre ellos?
+9. **Gestión del estado** - ¿El engine sigue el progreso?
+10. **Generación de PR** - ¿Crea pull requests finales?
 
-### **Decisiones de arquitectura Vagrant:**
-1. ¿Box: `ubuntu/jammy64` oficial o `bento/ubuntu-22.04`?
-2. ¿Sincronización: RSync (más simple) o NFS (más rápido)?
-3. ¿Networking: NAT (más seguro) o bridge (más accesible)?
-4. ¿Provisionamiento: shell scripts o Ansible?
+### **FASE 5: PRUEBAS AVANZADAS (1 hora)**
+- Probar con repositorios más complejos
+- Verificar manejo de errores
+- Probar límites del sistema
+- Verificar sincronización host-VM
 
-### **Decisiones de configuración Docker:**
-1. ¿Instalar Docker Compose V1 o V2?
-2. ¿Configurar Docker para usar overlay2 driver?
-3. ¿Añadir registry mirror para acelerar descargas?
-4. ¿Configurar límites de recursos Docker dentro de la VM?
+## 📊 **CRITERIOS DE ÉXITO:**
 
----
+### **✅ Éxito Mínimo (2 horas):**
+- [ ] VM arranca sin errores
+- [ ] Docker funciona (sin sudo, SDK Python conecta)
+- [ ] Imagen `tdh-base` construida
+- [ ] TDH Engine ejecuta análisis básico
 
-## 🎯 **MÉTRICA DE PROGRESO FINAL:**
+### **🟡 Éxito Moderado (4 horas):**
+- [ ] Engine clona repositorios y crea worktrees
+- [ ] Análisis SAST se ejecuta y produce resultados
+- [ ] Los SOTA reciben asignaciones
+- [ ] Al menos un SOTA completa una tarea
 
-Al final de esta sesión, deberíamos poder responder **SÍ** a:
-- [ ] ¿Puedo hacer `vagrant up` y tener un entorno funcional en 15 mins?
-- [ ] ¿Docker funciona NATIVAMENTE sin errores de socket?
-- [ ] ¿El TDH Engine ejecuta análisis completos dentro de la VM?
+### **🟢 Éxito Completo (6+ horas):**
+- [ ] **Todo el flujo funciona:**
+  - [ ] Análisis → Asignación → Trabajo SOTA → Fixes → PRs
+  - [ ] SOTA se comunican y colaboran
+  - [ ] Engine gestiona estados de múltiples SOTA
+  - [ ] PRs generadas para cada SOTA
+- [ ] Sistema es estable y reproducible
+
+## 🔧 **PUNTOS CRÍTICOS A VERIFICAR:**
+
+### **1. Docker y contenedores:**
+- ¿Los contenedores SOTA se crean correctamente?
+- ¿Tienen acceso al filesystem compartido?
+- ¿Pueden comunicarse entre sí?
+- ¿Los volúmenes Docker funcionan?
+
+### **2. Worktrees y Git:**
+- ¿El engine clona el repo correctamente?
+- ¿Crea worktrees para cada SOTA?
+- ¿Maneja branches y commits?
+
+### **3. Análisis SAST:**
+- ¿Las herramientas funcionan (semgrep, bandit, trivy)?
+- ¿Producen resultados parseables?
+- ¿El engine interpreta resultados correctamente?
+
+### **4. SOTA y LLMs:**
+- ¿Los SOTA reciben contexto adecuado?
+- ¿Pueden analizar código y vulnerabilidades?
+- ¿Generan fixes correctos?
+- ¿Se comunican efectivamente?
+
+### **5. Orquestación:**
+- ¿El engine gestiona estados correctamente?
+- ¿Maneja timeouts y errores?
+- ¿Genera PRs en formato correcto?
+
+## 📝 **ARCHIVOS CLAVE A MONITOREAR:**
+
+```
+/home/vagrant/tdh-engine/
+├── logs/                    # Logs del sistema
+├── reports/                 # Reportes de análisis
+├── results/                 # Resultados intermedios
+├── worktrees/              # Worktrees por SOTA
+└── docker-output/          # Output de contenedores
+```
+
+## 🐛 **ESCENARIOS DE FALLO Y SOLUCIONES:**
+
+### **Escenario 1: Docker permissions**
+```bash
+# Solución dentro de VM:
+sudo usermod -aG docker $USER
+sudo setfacl -m user:$USER:rw /var/run/docker.sock
+# Luego reconectar: exit && vagrant ssh
+```
+
+### **Escenario 2: Imagen no se construye**
+```bash
+# Verificar Dockerfile
+cd /home/vagrant/tdh-engine
+cat docker/Dockerfile.base
+
+# Construir manualmente con más verbosidad
+docker build --no-cache -t tdh-base:latest -f docker/Dockerfile.base .
+```
+
+### **Escenario 3: Análisis SAST falla**
+```bash
+# Probar herramientas individualmente
+semgrep scan --config auto .
+bandit -r .
+trivy fs .
+```
+
+### **Escenario 4: SOTA no responden**
+```bash
+# Verificar logs de contenedores
+docker logs <container_id>
+
+# Probar contenedor básico
+docker run --rm tdh-base:latest echo "test"
+```
+
+## 📈 **MÉTRICAS A CAPTURAR:**
+
+1. **Tiempos:**
+   - Tiempo de construcción de imagen
+   - Tiempo de análisis SAST
+   - Tiempo de procesamiento por SOTA
+   - Tiempo total del pipeline
+
+2. **Recursos:**
+   - Uso de RAM durante operación
+   - Uso de CPU durante peaks
+   - Espacio en disco usado
+
+3. **Calidad:**
+   - Número de vulnerabilidades identificadas
+   - Número de fixes generados
+   - Calidad de los fixes (¿compilan? ¿funcionan?)
+
+## 🎪 **FLUJO DE TRABAJO OPTIMIZADO:**
+
+```bash
+# Secuencia recomendada:
+1. make vagrant-up           # Iniciar VM
+2. make vagrant-ssh          # Conectar
+3. cd /home/vagrant/tdh-engine
+4. source venv/bin/activate  # Activar entorno
+5. make build-base           # Construir imagen si falta
+6. python tdh_unified.py sast-orchestrated <repo_url>
+
+# Mientras corre, monitorear:
+tail -f logs/tdh_engine.log  # Logs principales
+docker ps                    # Contenedores activos
+ls -la reports/              # Reportes generados
+```
+
+## 🤔 **PREGUNTAS CLAVE A RESPONDER:**
+
+1. **¿El entorno es reproducible?** ¿Otro desarrollador podría clonar y ejecutar?
+2. **¿El rendimiento es aceptable?** ¿Los tiempos son razonables para desarrollo?
+3. **¿Faltan dependencias?** ¿Alguna herramienta SAST falta o falla?
+4. **¿La sincronización funciona?** ¿Cambios en host aparecen en VM?
+5. **¿El flujo es automático?** ¿Requiere intervención manual?
+
+## 🚨 **BACKUP PLAN - SI TODO FALLA:**
+
+```bash
+# Opción nuclear:
+make vagrant-destroy
+make vagrant-up
+
+# Dentro de VM nueva:
+cd /home/vagrant/tdh-engine
+make vm-setup
+make vm-example
+```
+
+## 🎯 **VERIFICACIÓN FINAL - CHECKLIST:**
+
+Al final del día, deberíamos poder decir **SÍ** a:
+
+- [ ] ¿Puedo hacer `vagrant up` y tener entorno en 15 min?
+- [ ] ¿Docker funciona nativamente sin problemas?
+- [ ] ¿El TDH Engine ejecuta análisis completos?
+- [ ] ¿Los SOTA trabajan y colaboran?
+- [ ] ¿Se generan PRs al final del proceso?
 - [ ] ¿Puedo desarrollar en macOS y ejecutar en Linux sin dolor?
 
 ---
 
-## ⚠️ **JURAMENTO DE DESARROLLADOR:**
+## 📞 **PROMPT DE INICIO PARA DEEPSEEK (HOY):**
 
-> "Juro solemnemente jamás volver a intentar usar Docker Desktop en macOS para desarrollo profesional. Acepto que Vagrant/VirtualBox/Linux-native-Docker es el camino correcto, verdadero y sensato."
+"Hoy es el día de la verdad para el TDH Engine. Después de escapar de Docker Desktop y migrar a un entorno Vagrant estable con Docker nativo, necesitamos probar el sistema completo.
+
+**Contexto actual:** Tenemos una VM Vagrant con Ubuntu 22.04, Docker nativo funcionando, y el código del TDH Engine sincronizado. La imagen `tdh-base:latest` necesita ser construida desde `docker/Dockerfile.base`.
+
+**Objetivo inmediato:** Ejecutar el flujo completo del TDH Engine en el repositorio de prueba `https://github.com/alonsoir/test-zeromq-c-.git` y verificar todas las capacidades del sistema.
+
+**Primeras acciones:**
+1. Iniciar la VM (`make vagrant-up`)
+2. Conectar (`make vagrant-ssh`)
+3. Dentro de VM: `cd /home/vagrant/tdh-engine`
+4. Verificar entorno (`make env-info`, `make docker-info`, `make list-tools`)
+5. Construir imagen base si falta (`make build-base`)
+6. Ejecutar prueba completa (`make vm-example` o `python tdh_unified.py sast-orchestrated <repo>`)
+
+**Puntos críticos a monitorear:**
+- Permisos de Docker (sin sudo)
+- Creación de contenedores SOTA
+- Ejecución de análisis SAST
+- Comunicación entre SOTA
+- Generación de fixes y PRs
+
+**Preguntas para guiar la sesión:**
+1. ¿El entorno está completamente funcional o faltan dependencias?
+2. ¿Los permisos de Docker permiten ejecución sin sudo?
+3. ¿La imagen `tdh-base` se construye y funciona?
+4. ¿El engine puede crear worktrees y asignarlos a SOTA?
+5. ¿Los SOTA pueden comunicarse y colaborar en problemas?
+
+**Comencemos con la verificación del entorno y construcción de la imagen base.**
+
+**RECORDATORIO:** Esto no es solo una prueba técnica, es la validación de que hemos creado un sistema de análisis y corrección de código automatizado que funciona en un entorno estable y profesional, libre de los caprichos de Docker Desktop."
 
 ---
 
-**¿Mañana comenzamos con la migración a Vagrant?** Esta vez será diferente. Esta vez funcionará. 🚀💪
+## ⚡ **MANTRA DEL DÍA:**
+> "Hoy no debugueamos Docker Desktop. Hoy construimos el futuro del análisis automático de código."
+
+---
+
+**¿Listo para la prueba definitiva del TDH Engine? 🚀**  
+**Hoy descubriremos si nuestro sistema puede realmente orquestar múltiples agentes de IA para analizar y corregir código de forma autónoma.**
