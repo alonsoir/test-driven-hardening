@@ -135,6 +135,19 @@ class SASTPipeline:
                         "--no-rewrite-rule-ids"
                     ],
                     "timeout": 300
+                },
+                "trivy": {
+                "enabled": True,
+                "command": "trivy",
+                "args": [
+                    "fs",
+                    "--security-checks", "vuln,config,secret",
+                    "--format", "json",
+                    "--output", "{output_file}",
+                    "--severity", "CRITICAL,HIGH,MEDIUM,LOW"
+                ],
+                "timeout": 300,
+                "include_docker": True
                 }
             },
             "severity_mapping": {
@@ -164,9 +177,270 @@ class SASTPipeline:
             "bandit": [
                 {"pattern": "B101", "reason": "Test files allowed"},
                 {"pattern": "assert_used", "reason": "Testing framework"}
+            ],
+            "trivy": [
+                {"pattern": "CVE-2007-4559", "reason": "Falso positivo común en proyectos Python"},
+                {"pattern": "pip", "reason": "Advertencias de pip generalmente inofensivas"}
+            ],
+            "trivy-config": [
+                {"pattern": "hard-coded-secret", "reason": "Código de ejemplo o test"}
+            ],
+            "trivy-secret": [
+                {"pattern": "generic", "reason": "Posible falso positivo en texto genérico"}
             ]
         }
     
+    def run_trivy_scan(self, target_dir: str, output_file: str) -> bool:
+        """Ejecuta trivy para análisis de vulnerabilidades (versión síncrona)"""
+        try:
+            cmd = [
+                'trivy', 'fs',
+                '--security-checks', 'vuln,config,secret',
+                '--format', 'json',
+                '--output', output_file,
+                '--severity', 'CRITICAL,HIGH,MEDIUM,LOW',
+                target_dir
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300  # 5 minutos máximo
+            )
+            
+            if result.returncode in [0, 1]:  # 0=sin vulnerabilidades, 1=con vulnerabilidades
+                logger.info(f"✅ Trivy completado: {output_file}")
+                
+                # Opcional: verificar si hay resultados
+                if os.path.exists(output_file):
+                    with open(output_file, 'r') as f:
+                        data = json.load(f)
+                        if data.get('Results') or data.get('misconfigurations') or data.get('secrets'):
+                            logger.info(f"📊 Trivy encontró vulnerabilidades/configuraciones")
+                        else:
+                            logger.info(f"📊 Trivy no encontró problemas")
+                
+                return True
+            else:
+                logger.error(f"❌ Error en trivy: {result.stderr}")
+                return False
+                
+        except subprocess.TimeoutExpired:
+            logger.error("❌ Trivy timeout después de 300 segundos")
+            return False
+        except Exception as e:
+            logger.error(f"Error ejecutando trivy: {e}")
+            return False
+
+    async def _run_trivy(self, repo_path: str) -> List[Vulnerability]:
+        """Ejecutar trivy para análisis de vulnerabilidades, configuraciones y secretos"""
+        tool_config = self.config["tools"]["trivy"]
+        
+        if not tool_config["enabled"]:
+            return []
+        
+        # Crear archivo temporal para salida JSON
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as tmp:
+            output_file = tmp.name
+        
+        try:
+            # Construir comando
+            args = []
+            for arg in tool_config["args"]:
+                if arg == "{output_file}":
+                    args.append(output_file)
+                else:
+                    args.append(arg)
+            
+            cmd = [tool_config["command"]] + args + [repo_path]
+            
+            logger.info(f"🛠️  Ejecutando trivy: {' '.join(cmd)}")
+            
+            # Ejecutar trivy asíncronamente
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=repo_path
+            )
+            
+            stdout, stderr = await asyncio.wait_for(
+                process.communicate(),
+                timeout=tool_config["timeout"]
+            )
+            
+            # trivy retorna 0 si no hay vulnerabilidades, 1 si hay alguna
+            if process.returncode not in [0, 1]:
+                logger.warning(f"trivy retornó {process.returncode}: {stderr.decode()}")
+            
+            # Parsear resultados JSON
+            vulnerabilities = await self._parse_trivy_results(output_file, repo_path)
+            
+            return vulnerabilities
+            
+        except asyncio.TimeoutError:
+            logger.error("trivy timeout")
+            return []
+        except Exception as e:
+            logger.error(f"Error ejecutando trivy: {e}")
+            logger.error(f"stderr: {stderr.decode() if 'stderr' in locals() else 'N/A'}")
+            return []
+        finally:
+            # Limpiar archivo temporal
+            if os.path.exists(output_file):
+                os.unlink(output_file)
+
+    async def _parse_trivy_results(self, json_file: str, repo_path: str) -> List[Vulnerability]:
+        """Parsear resultados JSON de trivy"""
+        vulnerabilities = []
+        
+        try:
+            if not os.path.exists(json_file):
+                return vulnerabilities
+            
+            async with aiofiles.open(json_file, 'r') as f:
+                content = await f.read()
+                
+            if not content.strip():
+                return vulnerabilities
+                
+            results = json.loads(content)
+            
+            # Procesar resultados de trivy
+            # Trivy tiene diferentes estructuras según el tipo de análisis
+            
+            # 1. Vulnerabilidades en dependencias
+            if "Results" in results:
+                for result in results.get("Results", []):
+                    target = result.get("Target", "")
+                    type_ = result.get("Type", "")
+                    
+                    for vuln in result.get("Vulnerabilities", []):
+                        vuln_id = vuln.get("VulnerabilityID", "UNKNOWN")
+                        severity = vuln.get("Severity", "UNKNOWN").lower()
+                        description = vuln.get("Title", vuln.get("Description", ""))
+                        
+                        # Mapear severidad
+                        severity_map = {
+                            "critical": "critical",
+                            "high": "high", 
+                            "medium": "medium",
+                            "low": "low"
+                        }
+                        mapped_severity = severity_map.get(severity, "low")
+                        
+                        # Obtener CWE si está disponible
+                        cwe_ids = vuln.get("CweIDs", [])
+                        cwe_id = cwe_ids[0] if cwe_ids else None
+                        
+                        # Crear objeto de vulnerabilidad
+                        vuln_obj = Vulnerability(
+                            tool="trivy",
+                            vulnerability_id=vuln_id,
+                            severity=mapped_severity,
+                            confidence="high",  # trivy tiene alta confianza
+                            file_path=target,
+                            line_number=0,  # trivy no da línea específica para dependencias
+                            column=0,
+                            message=description,
+                            cwe_id=cwe_id,
+                            owasp_category=self._map_trivy_to_owasp(vuln_id, type_),
+                            code_snippet="",
+                            fix_suggestion=vuln.get("FixedVersion", ""),
+                            context={
+                                "pkg_name": vuln.get("PkgName", ""),
+                                "installed_version": vuln.get("InstalledVersion", ""),
+                                "primary_url": vuln.get("PrimaryURL", ""),
+                                "type": type_
+                            }
+                        )
+                        
+                        vulnerabilities.append(vuln_obj)
+            
+            # 2. Configuraciones inseguras
+            for result in results.get("misconfigurations", []):
+                target = result.get("target", "")
+                severity = result.get("severity", "UNKNOWN").lower()
+                
+                # Crear vulnerabilidad para misconfiguración
+                vuln_obj = Vulnerability(
+                    tool="trivy-config",
+                    vulnerability_id=result.get("id", "UNKNOWN"),
+                    severity=severity,
+                    confidence="high",
+                    file_path=target,
+                    line_number=0,
+                    column=0,
+                    message=result.get("title", ""),
+                    cwe_id=None,
+                    owasp_category="A05:2021-Security Misconfiguration",
+                    code_snippet="",
+                    fix_suggestion=result.get("resolution", ""),
+                    context={
+                        "description": result.get("description", ""),
+                        "type": "misconfiguration"
+                    }
+                )
+                
+                vulnerabilities.append(vuln_obj)
+            
+            # 3. Secretos expuestos
+            for secret in results.get("secrets", []):
+                file_path = secret.get("file", "")
+                line = secret.get("line", 0)
+                severity = "high"  # Los secretos son siempre de alta severidad
+                
+                vuln_obj = Vulnerability(
+                    tool="trivy-secret",
+                    vulnerability_id=secret.get("rule_id", "SECRET_LEAK"),
+                    severity=severity,
+                    confidence="high",
+                    file_path=file_path,
+                    line_number=line,
+                    column=secret.get("column", 0),
+                    message=f"Secreto expuesto: {secret.get('category', 'unknown')}",
+                    cwe_id="CWE-798",
+                    owasp_category="A02:2021-Cryptographic Failures",
+                    code_snippet=secret.get("code", ""),
+                    fix_suggestion="Remover el secreto, usar variables de entorno o servicios de gestión de secretos",
+                    context={
+                        "category": secret.get("category", ""),
+                        "match": secret.get("match", "")
+                    }
+                )
+                
+                vulnerabilities.append(vuln_obj)
+            
+            logger.info(f"📊 trivy encontró {len(vulnerabilities)} vulnerabilidades/configuraciones")
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Error parseando JSON de trivy: {e}")
+        except Exception as e:
+            logger.error(f"Error parseando resultados trivy: {e}")
+        
+        return vulnerabilities
+
+    def _map_trivy_to_owasp(self, vuln_id: str, type_: str) -> str:
+        """Mapear vulnerabilidad de trivy a categoría OWASP"""
+        # Mapeo por tipo y vulnerabilidad común
+        if "secret" in type_.lower():
+            return "A02:2021-Cryptographic Failures"
+        
+        # Mapeo por CVE conocido
+        if "CVE" in vuln_id:
+            # Ejemplos comunes
+            if "sql" in vuln_id.lower():
+                return "A03:2021-Injection"
+            elif "xss" in vuln_id.lower():
+                return "A03:2021-Injection"
+            elif "rce" in vuln_id.lower():
+                return "A08:2021-Software and Data Integrity Failures"
+            elif "dos" in vuln_id.lower():
+                return "A09:2021-Security Logging and Monitoring Failures"
+        
+        return "A06:2021-Vulnerable and Outdated Components"
+
     async def run_complete_analysis(self, repo_path: str) -> SASTResult:
         """Ejecutar análisis completo SAST"""
         logger.info(f"🔍 Iniciando análisis SAST en: {repo_path}")
@@ -185,6 +459,9 @@ class SASTPipeline:
         
         if self.config["tools"]["semgrep"]["enabled"]:
             tasks.append(self._run_semgrep(repo_path))
+
+        if self.config["tools"]["trivy"]["enabled"]:
+            tasks.append(self._run_trivy(repo_path))
         
         # Esperar a que todas las herramientas terminen
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -857,10 +1134,20 @@ class SASTPipeline:
         """Contar archivos escaneados"""
         try:
             count = 0
-            for ext in ['.c', '.cpp', '.h', '.hpp', '.py', '.java', '.js']:
-                count += len(list(Path(repo_path).rglob(f"*{ext}")))
+            extensions = [
+                '.c', '.cpp', '.h', '.hpp', '.py', '.java', '.js', 
+                '.ts', '.go', '.rs', '.rb', '.php', '.html', '.xml',
+                '.yml', '.yaml', '.json', '.toml', 'Dockerfile', '.sh'
+            ]
+            for ext in extensions:
+                if ext == 'Dockerfile':
+                    # Buscar archivos Dockerfile (sin extensión o con mayúsculas)
+                    count += len(list(Path(repo_path).rglob("Dockerfile*")))
+                else:
+                    count += len(list(Path(repo_path).rglob(f"*{ext}")))
             return count
-        except:
+        except Exception as e:
+            logger.error(f"Error contando archivos: {e}")
             return 0
     
     async def save_results(self, result: SASTResult, output_dir: str):

@@ -4,23 +4,18 @@
 Vagrant.configure("2") do |config|
   # Box oficial de Ubuntu
   config.vm.box = "ubuntu/jammy64"
-  
   config.vm.hostname = "tdh-engine-dev"
   
-  # Puerto 2223 para evitar conflicto con tu otra VM
+  # Puerto SSH
   config.vm.network "forwarded_port", guest: 22, host: 2223, id: "ssh"
   
-  # Ruta absoluta para evitar confusiones
+  # IMPORTANTE: Usar VirtualBox shared folders en lugar de NFS para OSX
+  # VirtualBox funciona mejor que NFS en OSX sin plugins adicionales
   project_root = File.expand_path("..", __dir__)
+
   config.vm.synced_folder project_root, "/home/vagrant/tdh-engine",
-    type: "rsync",
-    rsync__auto: true,
-    rsync__args: ["--verbose", "--archive", "--delete", "-z", "--chmod=ugo=rwX"],
-    rsync__exclude: [
-      ".git/", ".vagrant/", "venv/", "__pycache__/", "*.pyc", 
-      ".pytest_cache/", "node_modules/", ".DS_Store", "*.log", 
-      ".idea/", ".vscode/"
-    ]
+    type: "virtualbox",
+    mount_options: ["dmode=775", "fmode=664"]
   
   config.vm.provider "virtualbox" do |vb|
     vb.name = "tdh-engine-ubuntu"
@@ -33,101 +28,61 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
   end
   
+  # Scripts de provisionamiento (ajusta las rutas si es necesario)
   config.vm.provision "shell", path: "provision/01-base.sh", privileged: true
   config.vm.provision "shell", path: "provision/02-docker.sh", privileged: true
   config.vm.provision "shell", path: "provision/03-tools.sh", privileged: true
   config.vm.provision "shell", path: "provision/04-tdh.sh", privileged: false
   
-  # 5. Ejecución automática post-provision
+  # Configuración de herramientas SAST
   config.vm.provision "shell", run: "always", inline: <<-SHELL
-    echo "🚀 Configuración automática del TDH Engine..."
+    echo "🔧 Instalando herramientas SAST..."
     
-    # Cambiar al directorio del proyecto
+    # Instalar cppcheck
+    apt-get install -y cppcheck
+    
+    # Instalar flawfinder
+    apt-get install -y flawfinder
+    
+    # Instalar trivy
+    apt-get install -y wget apt-transport-https gnupg lsb-release
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
+    echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
+    apt-get update
+    apt-get install -y trivy
+    
+    echo "✅ Herramientas SAST instaladas"
+  SHELL
+  
+  # Configuración automática del entorno
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    echo "🚀 Configurando TDH Engine..."
+    
     cd /home/vagrant/tdh-engine
     
-    # Crear entorno virtual si no existe
+    # Crear entorno virtual
     if [ ! -d "venv" ]; then
-      echo "🐍 Creando entorno virtual Python..."
       python3 -m venv venv
     fi
     
-    # Activar entorno e instalar dependencias básicas
-    echo "📦 Instalando dependencias básicas..."
+    # Instalar dependencias
     source venv/bin/activate
-    pip install --quiet --upgrade pip
+    pip install --upgrade pip
+    
+    # Instalar requirements si existe
     if [ -f "requirements.txt" ]; then
-      pip install --quiet -r requirements.txt
+      pip install -r requirements.txt
     else
-      pip install --quiet docker aiofiles asyncio
+      pip install docker aiofiles aiohttp asyncio
     fi
     
-    # Construir imagen Docker base si existe Dockerfile
-    if [ -f "docker/Dockerfile.base" ]; then
-      echo "🐳 Construyendo imagen Docker base..."
-      docker build -t tdh-base:latest -f docker/Dockerfile.base . 2>/dev/null && \
-        echo "✅ Imagen tdh-base construida" || \
-        echo "⚠️  No se pudo construir imagen (puede construirse después con 'make build-base')"
-    fi
-    
-    # Configurar alias útiles
-    echo "🎨 Configurando alias y variables..."
+    # Crear alias
     cat << 'EOF' >> /home/vagrant/.bashrc
-    
-# TDH Engine shortcuts
-alias tdh-activate="cd /home/vagrant/tdh-engine && source venv/bin/activate"
-alias tdh-run="cd /home/vagrant/tdh-engine && source venv/bin/activate && python tdh_unified.py"
-alias tdh-example="cd /home/vagrant/tdh-engine && source venv/bin/activate && python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git"
-alias tdh-test="cd /home/vagrant/tdh-engine && source venv/bin/activate && python tdh_unified.py test"
-
-# Quick navigation
-alias cd-tdh="cd /home/vagrant/tdh-engine"
-alias ll="ls -la"
-alias cls="clear"
+alias tdh='cd /home/vagrant/tdh-engine && source venv/bin/activate && python tdh_unified.py'
+alias tdh-help='tdh --help'
+alias tdh-example='tdh sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git'
 EOF
     
-    echo "✨ Configuración automática completada"
+    echo "✨ Configuración completada"
   SHELL
-  
-  # 6. Mensaje post-instalación mejorado
-  config.vm.post_up_message = "
-🎉 TDH ENGINE VAGRANT ENVIRONMENT - READY!
-
-╔═══════════════════════════════════════════╗
-║         EVASIÓN DE DOCKER DESKTOP         ║
-║           COMPLETADA CON ÉXITO            ║
-╚═══════════════════════════════════════════╝
-
-📊 INFORMACIÓN:
-• VM: Ubuntu 22.04 LTS (estable como una roca)
-• Docker: NATIVO en Linux (🚫 NO Docker Desktop)
-• Puerto SSH: 2223 (tu otra VM usa 2222)
-
-🚀 COMANDOS DESDE HOST (macOS):
-  cd engine-prototype
-  make vagrant-ssh     # Conectar a VM
-
-🔧 DENTRO DE LA VM:
-  cd /home/vagrant/tdh-engine
-  source venv/bin/activate    # Activar entorno
-  make help                   # Ver todos los comandos
-
-🎪 EJEMPLO RÁPIDO (dentro de VM):
-  1. make vm-example          # Análisis completo de prueba
-  2. make docker-info         # Verificar Docker
-  3. make list-tools          # Ver herramientas SAST
-
-📂 DIRECTORIOS:
-  • Proyecto: /home/vagrant/tdh-engine
-  • Reportes: ./reports/ (sincronizado con host)
-  • Logs:     ./logs/
-
-🐳 DOCKER FUNCIONANDO:
-  $ docker ps                    # Sin sudo ✓
-  $ python -c \"import docker; print(docker.from_env().ping())\"  # True ✓
-
-📝 NOTA: Los cambios en macOS se sincronizan automáticamente
-         con la VM (rsync bidireccional).
-
-🔥 ¡ADIÓS DOCKER DESKTOP, HOLA ESTABILIDAD! 🚀
-"
 end

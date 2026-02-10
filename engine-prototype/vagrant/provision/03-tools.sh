@@ -59,6 +59,10 @@ curl -fsSL https://github.com/sharkdp/bat/releases/download/v0.24.0/bat-v0.24.0-
 curl -fsSL https://github.com/sharkdp/fd/releases/download/v8.7.1/fd-v8.7.1-x86_64-unknown-linux-musl.tar.gz | \
   tar -xz --strip-components=1 -C /usr/local/bin fd-v8.7.1-x86_64-unknown-linux-musl/fd
 
+# Instalar herramientas NFS
+echo "🔧 Instalando soporte NFS..."
+apt-get install -y nfs-common nfs-kernel-server
+
 # 4. Verificar instalaciones
 echo "✅ Herramientas instaladas:"
 echo "  - Node.js: $(node --version)"
