@@ -1,0 +1,48 @@
+vagrant@tdh-engine-dev:~/tdh-engine$ python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git 
+INFO:core.docker_manager:Conectando a Docker via from_env()
+INFO:core.docker_manager:✅ Conectado a Docker correctamente
+INFO:core.docker_manager:Conectando a Docker via from_env()
+INFO:core.docker_manager:✅ Conectado a Docker correctamente
+INFO:__main__:🚀 Ejecutando análisis orquestado para https://github.com/alonsoir/test-zeromq-c-.git
+INFO:core.sast_orchestrator:🚀 Iniciando análisis para https://github.com/alonsoir/test-zeromq-c-.git
+INFO:core.sast_orchestrator:🐳 Creando contenedor para claude-3-5...
+INFO:core.docker_manager:📁 Volumen creado: /tmp/tdh-volumes/tdh-claude-3-5-fd1580b7
+INFO:core.docker_manager:🐳 Creando contenedor tdh-claude-3-5-fd1580b7...
+INFO:core.docker_manager:⏳ Esperando a que el contenedor se inicie...
+INFO:core.docker_manager:📦 Clonando repositorio https://github.com/alonsoir/test-zeromq-c-.git...
+INFO:core.docker_manager:✅ Repositorio clonado
+INFO:core.docker_manager:✅ Contenedor creado exitosamente: tdh-claude-3-5-fd1580b7
+INFO:core.sast_orchestrator:🔍 Ejecutando análisis SAST...
+INFO:core.sast_orchestrator:🛠️  Ejecutando cppcheck...
+INFO:core.sast_orchestrator:🛠️  Ejecutando bandit...
+INFO:core.sast_orchestrator:🛠️  Ejecutando semgrep...
+INFO:core.sast_orchestrator:📊 Analizando código localmente...
+INFO:core.sast_pipeline:🔍 Iniciando análisis SAST en: /tmp/tmp102m1i6b
+INFO:core.sast_pipeline:🛠️  Ejecutando cppcheck: cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --suppress=unmatchedSuppression --xml --xml-version=2 --output-file=/tmp/tmpinw5bp3j.xml --platform=unix64 --std=c++11 --std=c99 /tmp/tmp102m1i6b
+INFO:core.sast_pipeline:🛠️  Ejecutando flawfinder: flawfinder --quiet --dataonly --csv --context /tmp/tmp102m1i6b
+INFO:core.sast_pipeline:🛠️  Ejecutando bandit: bandit -r -f json -o /tmp/tmp3enbooz7.json -lll /tmp/tmp102m1i6b
+INFO:core.sast_pipeline:🛠️  Ejecutando semgrep: semgrep --config auto --json -o /tmp/tmp1a7sw2ux.json --metrics off --no-rewrite-rule-ids /tmp/tmp102m1i6b
+INFO:core.sast_pipeline:🛠️  Ejecutando trivy: trivy fs --security-checks vuln,config,secret --format json --output /tmp/tmprs7avtgg.json --severity CRITICAL,HIGH,MEDIUM,LOW /tmp/tmp102m1i6b
+WARNING:core.sast_pipeline:semgrep output file is empty or doesn't exist: /tmp/tmp1a7sw2ux.json
+INFO:core.sast_pipeline:📊 bandit encontró 0 vulnerabilidades
+INFO:core.sast_pipeline:📊 flawfinder encontró 1089 vulnerabilidades
+INFO:core.sast_pipeline:📊 cppcheck encontró 142 vulnerabilidades
+INFO:core.sast_pipeline:📊 trivy encontró 0 vulnerabilidades/configuraciones
+INFO:core.sast_pipeline:Marcando como falso positivo: unusedFunction
+...
+INFO:core.sast_pipeline:✅ Análisis completado. Vulnerabilidades encontradas: 1183
+INFO:core.sast_orchestrator:🧹 Limpiando contenedor...
+INFO:core.docker_manager:🧹 Contenedor limpiado: tdh-claude-3-5-fd1580b7
+INFO:core.sast_pipeline:💾 Resultados guardados en: results/analysis_test-zeromq-c-
+
+============================================================
+✅ ANÁLISIS ORQUESTADO COMPLETADO
+============================================================
+Contenedor: tdh-claude-3-5-fd1580b7
+Vulnerabilidades encontradas: 1183
+Output: results/analysis_test-zeromq-c-
+============================================================
+
+📋 RECOMENDACIONES PARA LLM:
+  • Implementar pruebas unitarias específicas para casos de borde
+  • Revisar la gestión de memoria en funciones críticas

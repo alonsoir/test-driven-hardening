@@ -58,6 +58,20 @@ tools:
       - "p/security-audit"
       - "p/owasp-top-ten"
 
+  trivy:
+    enabled: true
+    command: trivy
+    args:
+      - "fs"
+      - "--security-checks"
+      - "vuln,config,secret"
+      - "--format"
+      - "json"
+      - "--output"
+      - "{output_file}"
+      - "--severity"
+      - "CRITICAL,HIGH,MEDIUM,LOW"
+    timeout: 300
 severity_mapping:
   critical: ["CRITICAL", "HIGH"]
   high: ["HIGH", "MEDIUM"]

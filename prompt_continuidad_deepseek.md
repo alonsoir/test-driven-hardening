@@ -1,294 +1,189 @@
-# 🤖 **PROMPT DE CONTINUIDAD - TDH ENGINE (DÍA 2 - LA PRUEBA DEFINITIVA)**
+## 📋 **PROMPT DE CONTINUIDAD – TDH ENGINE (2026-02-11)**
 
-## 📋 **CONTEXTO DE SESIÓN ANTERIOR:**
-**Fecha:** Domingo 9 de febrero, éxitos parciales  
-**Tema:** Gran migración a Vagrant - ¡Docker Desktop eliminado!  
-**Estado:** 
-- ✅ VM Vagrant configurada con Ubuntu 22.04 LTS
-- ✅ Docker nativo funcionando (el de verdad)
-- ✅ Docker SDK de Python conectando correctamente
-- ✅ Imagen `tdh-base:latest` localizada en `docker/Dockerfile.base`
-- ✅ Makefile adaptado para entorno Vagrant/host
-- ❌ Imagen `tdh-base` aún no construida (pendiente)
+---
 
-**Momento clave:** Docker Desktop es ahora un recuerdo traumático del pasado
+### ✅ **LO QUE HEMOS LOGRADO HOY**
 
-## 🎯 **OBJETIVO DE HOY: LA PRUEBA DEFINITIVA DEL TDH ENGINE**
+| Área | Estado | Detalle |
+|------|--------|---------|
+| **SAST Pipeline** | ✅ COMPLETO | 5 herramientas integradas: cppcheck, flawfinder, bandit, semgrep, **trivy** |
+| **Configuración SAST** | ✅ COMPLETO | `sast_config.yaml` con trivy, filtros de falsos positivos, mapeo CWE/OWASP |
+| **Entorno Vagrant** | ✅ ESTABLE | VM Ubuntu 22.04, sincronización VirtualBox shared folders, Docker nativo, herramientas SAST preinstaladas |
+| **Imagen Docker base** | ✅ CONSTRUIDA | `tdh-base:latest` con Python 3.11, compiladores, bandit, semgrep, requests (pendiente script SOTA) |
+| **Prueba end-to-end** | ✅ FUNCIONAL | `python tdh_unified.py test` clona repo, ejecuta SAST, crea contenedor, limpia – **sin ejecución de LLM** |
+| **Análisis orquestado** | ⚠️ PARCIAL | Crea 1 contenedor, ejecuta SAST, **no asigna tareas, no usa OpenRouter, no genera PRs** |
+| **SOTAs / OpenRouter** | ❌ NO IMPLEMENTADO | No hay llamadas API, no hay script agente, no hay consejo de sabios |
+| **Máquina de estados** | ❌ NO IMPLEMENTADO | Solo existe configuración YAML, no hay código que gestione estados |
+| **Pull Requests** | ❌ NO IMPLEMENTADO | No hay integración con GitHub API |
 
-**Meta final:** Verificar que el TDH Engine completo funciona en el nuevo entorno Vagrant, incluyendo todas las capacidades orquestadas.
+---
 
-## 🔬 **PLAN DE PRUEBAS POR FASES:**
+### 🧠 **ARQUITECTURA OBJETIVO (CONFIRMADA)**
 
-### **FASE 1: ARRANQUE Y VERIFICACIÓN (30 min)**
+#### 1. **Worktrees**
+- **Sí, un worktree es una copia funcional del repositorio en un directorio separado, compartiendo el historial de Git.**
+- El engine crea un worktree por cada SOTA dentro del volumen montado en su contenedor.
+- **No es una funcionalidad de GitHub, sino nativa de Git.**  
+  El engine usará `git worktree add` para tener una copia aislada que la SOTA pueda modificar libremente.
+
+#### 2. **Asignación de vulnerabilidades**
+- El engine **filtra solo vulnerabilidades HIGH y CRITICAL** del informe SAST.
+- Cada vulnerabilidad se asigna **individualmente** a una SOTA (configurable: una por SOTA o varias).
+- Se mantiene el **estado de cada tarea** (pendiente, en análisis, test diseñado, fix propuesto, documentado, listo para PR).
+- Las SOTAS **no** atacan todas las vulnerabilidades a la vez; el engine las dosifica.
+
+#### 3. **Comunicación entre SOTAS**
+- Las SOTAS pueden **interactuar entre sí** mediante el engine (o directamente si se habilita).
+- Los logs deben reflejar claramente: `[SOTA:claude-3-5] consultando a SOTA:gpt-4 sobre CWE-78`.
+- El engine actúa como **mediador** o permite que las SOTAS se envíen mensajes a través de la API.
+
+#### 4. **Entorno del contenedor SOTA**
+- Cada contenedor tiene **todas las herramientas del sistema base**: `cat, awk, grep, make, ls, wc, git`, etc.
+- **Soporte inicial**: proyectos C, C++ y Python que tengan un `Makefile` en la raíz.
+- El contenedor debe poder **compilar y ejecutar tests** (gcc/g++, make, python3).
+- **Script SOTA**: `sota_agent.py` (dentro del contenedor) que:
+  - Recibe vía `stdin` un JSON con: `repo_path`, `model`, `vulnerability`, `openrouter_api_key`.
+  - Construye el prompt adecuado (configurable desde YAML).
+  - Llama a OpenRouter API.
+  - Devuelve un JSON con `test_code`, `fixed_code`, `explanation`.
+  - Opcionalmente puede ejecutar comandos en el worktree (buscar, editar, compilar).
+
+#### 5. **Generación de Pull Requests**
+- El engine, **después de recibir el resultado de la SOTA**, aplica los cambios en el worktree correspondiente.
+- Crea una **rama** con nombre `sota/<modelo>/<cwe-id>`.
+- Hace commit y push.
+- Crea una **Pull Request** usando la API de GitHub (token con permisos).
+- La PR incluye el test y el fix, con descripción generada por la SOTA.
+
+---
+
+### 📦 **ESTADO DEL CÓDIGO ACTUAL (POST-COMMIT)**
+
+- **Rama activa**: `feature/tdh-state-machines-20260207`
+- **Commit HEAD**: `85e15f7` – "feat(sast): integrate Trivy for comprehensive security scanning"
+- **Archivos pendientes de commit**: 
+  - `../prompt_continuidad_deepseek.md` (modificado)
+  - `../AGENTS.md` (untracked)
+- **Vagrantfile actualizado**: usa VirtualBox shared folders, provisionamiento limpio, sin plugins problemáticos.
+- **Dockerfile.base**: listo, solo falta añadir `sota_agent.py` y dependencia `requests` (ya instalada).
+
+---
+
+### 🎯 **PLAN DE ACCIÓN PARA MAÑANA (2026-02-12)**
+
+#### 🔹 **FASE 0 – REPRODUCIBILIDAD (MAKE)**
+- [ ] Asegurar que todo el flujo se puede lanzar con `make` desde la raíz del proyecto.
+- [ ] Verificar que `make vagrant-up`, `make build-base`, `make test` funcionan sin errores.
+- [ ] Confirmar que la imagen `tdh-base` tiene Python 3.11, requests, y el script `sota_agent.py` (aunque sea un placeholder).
+
+#### 🔹 **FASE 1 – AGENTE OPENROUTER DENTRO DEL CONTENEDOR**
+- [ ] Crear `docker/sota_agent.py` con:
+  - Lectura de JSON desde stdin.
+  - Llamada a OpenRouter API usando `requests`.
+  - Manejo de errores y timeout.
+  - Salida JSON.
+- [ ] Modificar `docker/Dockerfile.base` para copiar el script y hacerlo ejecutable.
+- [ ] Reconstruir imagen: `make build-base`.
+- [ ] **Prueba manual**: `docker run -e OPENROUTER_API_KEY=<key> tdh-base python3 /usr/local/bin/sota_agent.py < test_input.json`
+
+#### 🔹 **FASE 2 – ORQUESTADOR MULTI-SOTA**
+- [ ] Leer `config/llm_council.yaml` y cargar las SOTAS habilitadas.
+- [ ] Modificar `sast_orchestrator.py` para:
+  - Filtrar vulnerabilidades HIGH/CRITICAL.
+  - **Crear un contenedor por cada SOTA** (no solo una).
+  - Para cada contenedor:
+    - Montar un **worktree** específico (usando `git worktree add` dentro del volumen).
+    - Inyectar la API key y los datos de la vulnerabilidad.
+    - Ejecutar `sota_agent.py` y esperar resultado (asíncrono, con timeout configurable).
+    - Registrar el estado de la tarea en una máquina de estados (puede ser simple: diccionario en memoria).
+  - Recoger resultados y mostrarlos en logs.
+- [ ] Agregar logs de interacción entre SOTAS (simulado al principio, luego real).
+
+#### 🔹 **FASE 3 – MÁQUINA DE ESTADOS Y LOGS**
+- [ ] Implementar `StateMachine` simple (o usar `transitions` library).
+- [ ] Por cada SOTA/tarea, cambiar estado: `ASSIGNED → ANALYZING → TEST_DESIGN → FIX_DESIGN → DOCUMENTING → PR_READY`.
+- [ ] Mostrar en consola el progreso de cada SOTA en tiempo real (usar `rich` o similar).
+
+#### 🔹 **FASE 4 – GENERACIÓN DE PULL REQUESTS**
+- [ ] Integrar `PyGithub` en el engine.
+- [ ] Obtener token de GitHub desde variable de entorno.
+- [ ] Función para crear rama, commit y PR por cada SOTA.
+- [ ] Incluir en la PR los archivos modificados y el mensaje generado por la LLM.
+
+---
+
+### ⚠️ **RESTRICCIONES Y SUPUESTOS PARA MAÑANA**
+
+1. **Solo se analizarán repositorios que contengan un Makefile** (simplifica compilación y tests).
+2. **Las vulnerabilidades asignadas serán únicamente HIGH/CRITICAL**.
+3. **Cada SOTA recibirá UNA vulnerabilidad por ejecución** (configurable después).
+4. **OpenRouter API key** debe estar presente en el entorno del engine (`OPENROUTER_API_KEY`).
+5. **GitHub token** (`GITHUB_TOKEN`) para creación de PRs (opcional al principio, podemos simular).
+6. **Los prompts serán configurables** desde `llm_council.yaml` (sección `state_prompts`).
+7. **Los contenedores tendrán acceso a Internet** (para llamar a OpenRouter).
+
+---
+
+### 📝 **LO QUE DEJAMOS ESCRITO (ESTE PROMPT)**
+
+Este documento (`prompt_continuidad_deepseek.md`) debe ser commiteado para tener un registro claro del estado y los siguientes pasos. Después de este commit, mañana continuaremos con la implementación de las fases 1-4.
+
+---
+
+### 🚀 **COMANDOS PARA COMENZAR MAÑANA**
+
 ```bash
-# Desde macOS
+# 1. Actualizar el repositorio
 cd engine-prototype
-make vagrant-up          # Ver que todo carga
-make vagrant-ssh         # Conectar
+git pull origin feature/tdh-state-machines-20260207
 
-# Dentro de VM
+# 2. Levantar entorno limpio (si es necesario)
+cd vagrant
+vagrant destroy -f
+vagrant up
+
+# 3. Conectarse a la VM
+vagrant ssh
+
+# 4. Dentro de la VM:
 cd /home/vagrant/tdh-engine
-make env-info           # Verificar entorno
-make docker-info        # Verificar Docker
-make list-tools         # Verificar herramientas SAST
-docker images           # Verificar imagen tdh-base
-```
+source venv/bin/activate
+export OPENROUTER_API_KEY="tu-api-key"
+export GITHUB_TOKEN="tu-token"
 
-### **FASE 2: CONSTRUCCIÓN DE IMAGEN BASE (15 min)**
-```bash
-# Si falta la imagen:
+# 5. Construir imagen base con el nuevo script
 make build-base
 
-# Verificar construcción
-docker run --rm tdh-base:latest semgrep --version
-docker run --rm tdh-base:latest bandit --version
-```
+# 6. Probar agente manualmente
+echo '{"model":"claude-3.5-sonnet","repo_path":"/workspace/repo","vulnerability":{...}}' | \
+docker run -i --rm -e OPENROUTER_API_KEY tdh-base python3 /usr/local/bin/sota_agent.py
 
-### **FASE 3: PRUEBA BÁSICA DEL ENGINE (1 hora)**
-```bash
-# Ejecutar el ejemplo completo
-make vm-example
-
-# O manualmente:
-source venv/bin/activate
+# 7. Ejecutar análisis orquestado (aún sin SOTAS, hasta implementar)
 python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git
 ```
 
-**Verificar que:**
-- ✅ El engine se conecta a Docker
-- ✅ Clona el repositorio de prueba
-- ✅ Crea contenedores para cada SOTA
-- ✅ Asigna worktrees a miembros del consejo
-- ✅ Ejecuta análisis SAST/AST
-- ✅ Asigna resultados a los SOTA
+---
 
-### **FASE 4: PRUEBA DEL FLUJO COMPLETO (2-3 horas)**
-**Etapas a verificar por cada SOTA:**
-1. **Análisis de problema crítico** - ¿Identifican vulnerabilidades?
-2. **Test de demostración de criticidad** - ¿Crean PoC del problema?
-3. **Producción del fix** - ¿Generan solución?
-4. **Compilación del fix** - ¿Compila correctamente?
-5. **Ejecución del fix** - ¿Funciona el código corregido?
-6. **Test de verificación** - ¿Pasa las pruebas?
-7. **Documentación** - ¿Generan documentación del cambio?
-8. **Comunicación entre SOTA** - ¿Colaboran entre ellos?
-9. **Gestión del estado** - ¿El engine sigue el progreso?
-10. **Generación de PR** - ¿Crea pull requests finales?
+## ✅ **CONFIRMACIÓN DE ENTENDIMIENTO**
 
-### **FASE 5: PRUEBAS AVANZADAS (1 hora)**
-- Probar con repositorios más complejos
-- Verificar manejo de errores
-- Probar límites del sistema
-- Verificar sincronización host-VM
+He entendido perfectamente:
+- **Worktrees = copia aislada funcional**, el engine las gestiona.
+- **Asignación granular de vulnerabilidades**, solo HIGH/CRITICAL.
+- **SOTAS remotas vía OpenRouter**, con script dentro del contenedor.
+- **Máquina de estados y logs de interacción**.
+- **Soporte inicial C/C++/Python con Makefile**.
+- **PRs por SOTA**.
 
-## 📊 **CRITERIOS DE ÉXITO:**
-
-### **✅ Éxito Mínimo (2 horas):**
-- [ ] VM arranca sin errores
-- [ ] Docker funciona (sin sudo, SDK Python conecta)
-- [ ] Imagen `tdh-base` construida
-- [ ] TDH Engine ejecuta análisis básico
-
-### **🟡 Éxito Moderado (4 horas):**
-- [ ] Engine clona repositorios y crea worktrees
-- [ ] Análisis SAST se ejecuta y produce resultados
-- [ ] Los SOTA reciben asignaciones
-- [ ] Al menos un SOTA completa una tarea
-
-### **🟢 Éxito Completo (6+ horas):**
-- [ ] **Todo el flujo funciona:**
-  - [ ] Análisis → Asignación → Trabajo SOTA → Fixes → PRs
-  - [ ] SOTA se comunican y colaboran
-  - [ ] Engine gestiona estados de múltiples SOTA
-  - [ ] PRs generadas para cada SOTA
-- [ ] Sistema es estable y reproducible
-
-## 🔧 **PUNTOS CRÍTICOS A VERIFICAR:**
-
-### **1. Docker y contenedores:**
-- ¿Los contenedores SOTA se crean correctamente?
-- ¿Tienen acceso al filesystem compartido?
-- ¿Pueden comunicarse entre sí?
-- ¿Los volúmenes Docker funcionan?
-
-### **2. Worktrees y Git:**
-- ¿El engine clona el repo correctamente?
-- ¿Crea worktrees para cada SOTA?
-- ¿Maneja branches y commits?
-
-### **3. Análisis SAST:**
-- ¿Las herramientas funcionan (semgrep, bandit, trivy)?
-- ¿Producen resultados parseables?
-- ¿El engine interpreta resultados correctamente?
-
-### **4. SOTA y LLMs:**
-- ¿Los SOTA reciben contexto adecuado?
-- ¿Pueden analizar código y vulnerabilidades?
-- ¿Generan fixes correctos?
-- ¿Se comunican efectivamente?
-
-### **5. Orquestación:**
-- ¿El engine gestiona estados correctamente?
-- ¿Maneja timeouts y errores?
-- ¿Genera PRs en formato correcto?
-
-## 📝 **ARCHIVOS CLAVE A MONITOREAR:**
-
-```
-/home/vagrant/tdh-engine/
-├── logs/                    # Logs del sistema
-├── reports/                 # Reportes de análisis
-├── results/                 # Resultados intermedios
-├── worktrees/              # Worktrees por SOTA
-└── docker-output/          # Output de contenedores
-```
-
-## 🐛 **ESCENARIOS DE FALLO Y SOLUCIONES:**
-
-### **Escenario 1: Docker permissions**
-```bash
-# Solución dentro de VM:
-sudo usermod -aG docker $USER
-sudo setfacl -m user:$USER:rw /var/run/docker.sock
-# Luego reconectar: exit && vagrant ssh
-```
-
-### **Escenario 2: Imagen no se construye**
-```bash
-# Verificar Dockerfile
-cd /home/vagrant/tdh-engine
-cat docker/Dockerfile.base
-
-# Construir manualmente con más verbosidad
-docker build --no-cache -t tdh-base:latest -f docker/Dockerfile.base .
-```
-
-### **Escenario 3: Análisis SAST falla**
-```bash
-# Probar herramientas individualmente
-semgrep scan --config auto .
-bandit -r .
-trivy fs .
-```
-
-### **Escenario 4: SOTA no responden**
-```bash
-# Verificar logs de contenedores
-docker logs <container_id>
-
-# Probar contenedor básico
-docker run --rm tdh-base:latest echo "test"
-```
-
-## 📈 **MÉTRICAS A CAPTURAR:**
-
-1. **Tiempos:**
-   - Tiempo de construcción de imagen
-   - Tiempo de análisis SAST
-   - Tiempo de procesamiento por SOTA
-   - Tiempo total del pipeline
-
-2. **Recursos:**
-   - Uso de RAM durante operación
-   - Uso de CPU durante peaks
-   - Espacio en disco usado
-
-3. **Calidad:**
-   - Número de vulnerabilidades identificadas
-   - Número de fixes generados
-   - Calidad de los fixes (¿compilan? ¿funcionan?)
-
-## 🎪 **FLUJO DE TRABAJO OPTIMIZADO:**
-
-```bash
-# Secuencia recomendada:
-1. make vagrant-up           # Iniciar VM
-2. make vagrant-ssh          # Conectar
-3. cd /home/vagrant/tdh-engine
-4. source venv/bin/activate  # Activar entorno
-5. make build-base           # Construir imagen si falta
-6. python tdh_unified.py sast-orchestrated <repo_url>
-
-# Mientras corre, monitorear:
-tail -f logs/tdh_engine.log  # Logs principales
-docker ps                    # Contenedores activos
-ls -la reports/              # Reportes generados
-```
-
-## 🤔 **PREGUNTAS CLAVE A RESPONDER:**
-
-1. **¿El entorno es reproducible?** ¿Otro desarrollador podría clonar y ejecutar?
-2. **¿El rendimiento es aceptable?** ¿Los tiempos son razonables para desarrollo?
-3. **¿Faltan dependencias?** ¿Alguna herramienta SAST falta o falla?
-4. **¿La sincronización funciona?** ¿Cambios en host aparecen en VM?
-5. **¿El flujo es automático?** ¿Requiere intervención manual?
-
-## 🚨 **BACKUP PLAN - SI TODO FALLA:**
-
-```bash
-# Opción nuclear:
-make vagrant-destroy
-make vagrant-up
-
-# Dentro de VM nueva:
-cd /home/vagrant/tdh-engine
-make vm-setup
-make vm-example
-```
-
-## 🎯 **VERIFICACIÓN FINAL - CHECKLIST:**
-
-Al final del día, deberíamos poder decir **SÍ** a:
-
-- [ ] ¿Puedo hacer `vagrant up` y tener entorno en 15 min?
-- [ ] ¿Docker funciona nativamente sin problemas?
-- [ ] ¿El TDH Engine ejecuta análisis completos?
-- [ ] ¿Los SOTA trabajan y colaboran?
-- [ ] ¿Se generan PRs al final del proceso?
-- [ ] ¿Puedo desarrollar en macOS y ejecutar en Linux sin dolor?
+**Mañana nos enfocamos en Fase 1 y 2** para tener el primer flujo completo con una SOTA real.  
 
 ---
 
-## 📞 **PROMPT DE INICIO PARA DEEPSEEK (HOY):**
+📌 **Ahora puedes hacer commit de este archivo y empezar mañana con energía.** 💪
 
-"Hoy es el día de la verdad para el TDH Engine. Después de escapar de Docker Desktop y migrar a un entorno Vagrant estable con Docker nativo, necesitamos probar el sistema completo.
+```bash
+git add ../prompt_continuidad_deepseek.md ../AGENTS.md
+git commit -m "docs: add continuity prompt for 2026-02-11 detailing next steps (OpenRouter, multi-SOTA, PRs)"
+git push origin feature/tdh-state-machines-20260207
+```
 
-**Contexto actual:** Tenemos una VM Vagrant con Ubuntu 22.04, Docker nativo funcionando, y el código del TDH Engine sincronizado. La imagen `tdh-base:latest` necesita ser construida desde `docker/Dockerfile.base`.
-
-**Objetivo inmediato:** Ejecutar el flujo completo del TDH Engine en el repositorio de prueba `https://github.com/alonsoir/test-zeromq-c-.git` y verificar todas las capacidades del sistema.
-
-**Primeras acciones:**
-1. Iniciar la VM (`make vagrant-up`)
-2. Conectar (`make vagrant-ssh`)
-3. Dentro de VM: `cd /home/vagrant/tdh-engine`
-4. Verificar entorno (`make env-info`, `make docker-info`, `make list-tools`)
-5. Construir imagen base si falta (`make build-base`)
-6. Ejecutar prueba completa (`make vm-example` o `python tdh_unified.py sast-orchestrated <repo>`)
-
-**Puntos críticos a monitorear:**
-- Permisos de Docker (sin sudo)
-- Creación de contenedores SOTA
-- Ejecución de análisis SAST
-- Comunicación entre SOTA
-- Generación de fixes y PRs
-
-**Preguntas para guiar la sesión:**
-1. ¿El entorno está completamente funcional o faltan dependencias?
-2. ¿Los permisos de Docker permiten ejecución sin sudo?
-3. ¿La imagen `tdh-base` se construye y funciona?
-4. ¿El engine puede crear worktrees y asignarlos a SOTA?
-5. ¿Los SOTA pueden comunicarse y colaborar en problemas?
-
-**Comencemos con la verificación del entorno y construcción de la imagen base.**
-
-**RECORDATORIO:** Esto no es solo una prueba técnica, es la validación de que hemos creado un sistema de análisis y corrección de código automatizado que funciona en un entorno estable y profesional, libre de los caprichos de Docker Desktop."
-
----
-
-## ⚡ **MANTRA DEL DÍA:**
-> "Hoy no debugueamos Docker Desktop. Hoy construimos el futuro del análisis automático de código."
-
----
-
-**¿Listo para la prueba definitiva del TDH Engine? 🚀**  
-**Hoy descubriremos si nuestro sistema puede realmente orquestar múltiples agentes de IA para analizar y corregir código de forma autónoma.**
+**¡Hasta mañana!** 🚀
