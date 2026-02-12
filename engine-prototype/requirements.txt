@@ -1,19 +1,15 @@
-# engine-prototype/requirements.txt
+# Core
 docker>=6.1.0
-aiohttp>=3.9.0
-aiofiles>=23.2.0  # ¡Falta esta!
-asyncio>=3.4.3
-PyYAML>=6.0
-pydantic>=2.5.0
-rich>=13.7.0
-python-magic>=0.4.27
-gitpython>=3.1.40
-semgrep>=1.36.0
-bandit>=1.7.8
-pandas>=2.1.0
-numpy>=1.24.0
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-httpx>=0.25.0
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
+aiofiles>=23.2.0
+python-dotenv>=1.0.0
+
+# SOTA Agent (dentro del contenedor ya está, pero para el host/VM)
+requests>=2.31.0
+pyyaml>=6.0.1
+
+# GitHub API
+PyGithub>=2.1.0
+
+# SAST (opcional, algunas herramientas ya están en el contenedor)
+semgrep>=1.44.0
+bandit>=1.7.5
