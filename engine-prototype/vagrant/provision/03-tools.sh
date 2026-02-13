@@ -1,4 +1,5 @@
 #!/bin/bash
+# 03-tools.sh
 set -e
 
 echo "🔧 Instalando herramientas SAST y de desarrollo..."

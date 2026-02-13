@@ -1,4 +1,5 @@
 #!/bin/bash
+#02-docker.sh
 set -e
 
 echo "🐳 INSTALANDO DOCKER NATIVO EN LINUX (la forma correcta)"

@@ -1,3 +1,21 @@
-git add docker/Dockerfile.base Makefile requirements.txt tdh_unified.py src/core/sast_orchestrator.py
-git commit -m "feat(orchestrator): integración completa multi‑SOTA con worktrees y PRs"
-git push origin feature/tdh-state-machines-20260207
+## 🚀 ¡Commit molón para hoy!
+
+```bash
+git add .
+git commit -m "feat(orchestrator): multi‑SOTA orchestration fully functional in dry‑run mode
+
+- Integrates SAST analysis with cppcheck, flawfinder, bandit, semgrep, trivy
+- Filters vulnerabilities by severity (HIGH/CRITICAL) using llm_council.yaml
+- Creates unique worktrees per vulnerability with timestamped branch names
+- Assigns models round‑robin from council configuration
+- Simulates agent containers and PR creation in dry‑run
+- Generates detailed JSON reports and console summaries
+- Handles errors gracefully and limits concurrent tasks (MAX_VULNS=2)
+
+Next steps: enable real OpenRouter execution, verify agent iteration (test→fix),
+and create live GitHub Pull Requests."
+```
+
+---
+
+Mañana, con la VM limpia y las claves listas, veremos el flujo completo. ¡Esto ya casi es real!

@@ -192,6 +192,15 @@ class TDHUnified:
                 council_filter=council,
                 dry_run=dry_run
             )
+            if result is None:
+                result = {
+                    "total_tasks": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "pr_created": 0,
+                    "prs": [],
+                    "tasks": []
+                }
         except Exception as e:
             logger.exception("Error fatal en orquestación")
             print(f"❌ Error: {e}")

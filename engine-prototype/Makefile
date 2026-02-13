@@ -133,7 +133,17 @@ vagrant-status:
 
 # ----------------------------------------------------------------------
 # Comandos dentro de la VM
-vm-setup: setup-deps build-base
+vm-setup:
+	@echo "$(BLUE)🔧 Verificando entorno en VM...$(NC)"
+	@if [ "$(IS_VAGRANT)" != "true" ]; then \
+		echo "$(RED)❌ Debes ejecutar esto dentro de la VM$(NC)"; \
+		exit 1; \
+	fi
+	@if [ ! -d "/home/vagrant/tdh-venv" ]; then \
+		echo "$(RED)❌ Entorno virtual no encontrado. Ejecuta la provisión primero.$(NC)"; \
+		exit 1; \
+	fi
+	@make build-base
 	@echo "$(GREEN)✅ VM lista.$(NC)"
 
 vm-example:
@@ -142,7 +152,8 @@ vm-example:
 		echo "$(RED)❌ Debes ejecutar esto dentro de la VM$(NC)"; \
 		exit 1; \
 	fi
-	@$(VENV_PATH)/bin/python tdh_unified.py sast-orchestrated \
+	@. /home/vagrant/tdh-venv/bin/activate && \
+	 python /home/vagrant/tdh-engine/tdh_unified.py sast-orchestrated \
 		https://github.com/alonsoir/test-zeromq-c-.git \
 		--dry-run
 

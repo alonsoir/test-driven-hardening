@@ -41,7 +41,7 @@ RUN pip3 install --no-cache-dir \
     docker aiohttp asyncio
 
 # Copiar el agente SOTA
-COPY sota_agent.py /usr/local/bin/sota_agent.py
+COPY docker/sota_agent.py /usr/local/bin/sota_agent.py
 RUN chmod +x /usr/local/bin/sota_agent.py
 
 # Usuario no-root

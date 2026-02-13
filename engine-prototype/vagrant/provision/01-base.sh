@@ -1,4 +1,5 @@
 #!/bin/bash
+# 01-base.sh
 set -e
 
 echo "🔄 Actualizando sistema base..."
