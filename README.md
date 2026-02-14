@@ -5,7 +5,7 @@ Motor de análisis de seguridad avanzado que combina análisis SAST tradicional 
 
 ## 🏗️ Arquitectura del Proyecto
 
-```
+
 engine-prototype/
 ├── tdh_unified.py                 # 🎛️ CLI unificada (punto de entrada principal)
 ├── src/
