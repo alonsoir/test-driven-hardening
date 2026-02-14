@@ -14,6 +14,7 @@ import re
 import subprocess
 import requests
 from pathlib import Path
+import time
 
 # ----------------------------------------------------------------------
 # Constants
@@ -147,7 +148,8 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
         result = call_openrouter(model_display, prompt, api_key, temperature, max_tokens)
         
         if not result["success"]:
-            log(f"LLM call failed: {result['error']}", model_display, state="test_designing")
+            log(f"LLM call failed (sleeping): {result['error']}", model_display, state="test_designing")
+            time.sleep(2 ** (attempt - 1))
             continue
 
         response = result["content"]
@@ -276,9 +278,17 @@ def main():
     # Flow
     t_code, t_cmd, t_ok, _ = phase_test_design(config, model_config, vulnerability, repo_path, api_key, max_iter)
     
-    f_code, f_cmd, f_ok, _ = ("", "", False, "")
-    if t_ok:
-        f_code, f_cmd, f_ok, _ = phase_fix_design(config, model_config, vulnerability, t_code, t_cmd, repo_path, api_key, max_iter)
+    if not t_ok:
+        log("Test phase failed, exiting", model_config["model"], state="failed")
+        output = {
+            "status": "error",
+            "reason": "test_failed",
+            "model_used": model_config["model"]
+        }
+        print(json.dumps(output))
+        sys.exit(1)
+
+    f_code, f_cmd, f_ok, _ = phase_fix_design(config, model_config, vulnerability, t_code, t_cmd, repo_path, api_key, max_iter)
     
     summary = f"Test: {t_ok}, Fix: {f_ok}"
     explanation = phase_document(config, model_config, vulnerability, t_code, f_code, summary, api_key)

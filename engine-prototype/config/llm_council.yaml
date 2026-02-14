@@ -5,54 +5,55 @@
 # Modelos SOTA disponibles para el consejo de seguridad
 # ----------------------------------------------------------------------
 llm_configs:
-  claude-3-5-sonnet:
+  gemma-3-27b:
     provider: openrouter
-    model: claude-3.5-sonnet
+    model: google/gemma-3-27b-it:free
     max_tokens: 4000
     temperature: 0.1
     priority: 1
 
-  gpt-4-turbo:
+  llama-3.2-3b:
     provider: openrouter
-    model: gpt-4-turbo
+    model: meta-llama/llama-3.2-3b-instruct:free
     max_tokens: 4000
     temperature: 0.1
     priority: 2
 
-  deepseek-coder:
+  hermes-3-405b:
     provider: openrouter
-    model: deepseek-coder
+    model: nousresearch/hermes-3-llama-3.1-405b:free
     max_tokens: 4000
     temperature: 0.1
     priority: 3
-
-  gemini-pro:
+  qwen-coder:
     provider: openrouter
-    model: gemini-pro
+    model: qwen/qwen3-coder:free
     max_tokens: 4000
     temperature: 0.1
     priority: 4
 
-  llama-3-1-70b:
+  llama-3-3:
     provider: openrouter
-    model: llama-3.1-70b
+    model: meta-llama/llama-3.3-70b-instruct:free
     max_tokens: 4000
     temperature: 0.1
     priority: 5
 
-  codellama-70b:
+  mistral-small:
     provider: openrouter
-    model: codellama-70b
+    model: mistralai/mistral-small-3.1-24b-instruct:free
     max_tokens: 4000
     temperature: 0.1
     priority: 6
+
+  
 
 # ----------------------------------------------------------------------
 # Configuración del consejo (selección, votación, tiempos)
 # ----------------------------------------------------------------------
 council_settings:
   min_llms: 3
-  max_llms: 5
+  max_llms: 3
   preferred_count: 3          # Impar para votación
   timeout_seconds: 300
   enable_discussion: true

@@ -169,6 +169,23 @@ class SASTOrchestrator:
             logger.error(f"Error cargando {path}: {e}")
             return {}
 
+    def _get_authenticated_repo_url(self, repo_url: str) -> str:
+        """
+        Si hay token de GitHub, lo inyecta en la URL para autenticación.
+        Retorna la URL original si no hay token o la URL ya contiene credenciales.
+        """
+        if not self.github_token:
+            return repo_url
+        # Solo modificar URLs https
+        if repo_url.startswith("https://"):
+            # Insertar token antes del @ o al principio
+            if "@" in repo_url:
+                # Ya tiene credenciales, no sobrescribir
+                return repo_url
+            # Insertar token
+            return repo_url.replace("https://", f"https://{self.github_token}@")
+        return repo_url
+
     async def _run_sast(self, repo_url: str) -> List[Vulnerability]:
         """
         Ejecuta análisis SAST sobre el repositorio y retorna lista de vulnerabilidades
@@ -176,16 +193,14 @@ class SASTOrchestrator:
         """
         logger.info(f"🔍 Ejecutando análisis SAST en {repo_url}")
         
-        # Clonar el repositorio temporalmente si es necesario
-        import tempfile
-        import subprocess
-        from pathlib import Path
+        # Usar URL autenticada para clonar (si el repo es privado)
+        auth_url = self._get_authenticated_repo_url(repo_url)
         
         with tempfile.TemporaryDirectory() as tmp_dir:
             logger.info(f"📦 Clonando repositorio a {tmp_dir}")
             try:
                 subprocess.run(
-                    ["git", "clone", "--depth", "1", repo_url, tmp_dir],
+                    ["git", "clone", "--depth", "1", auth_url, tmp_dir],
                     check=True,
                     capture_output=True,
                     text=True
@@ -239,7 +254,7 @@ class SASTOrchestrator:
 
         if not vulnerabilities:
             logger.warning("No se encontraron vulnerabilidades")
-            return
+            return self._empty_result()
 
         # 2. Filtrar por severidad HIGH/CRITICAL
         severities_to_process = {"high", "critical"}
@@ -253,14 +268,7 @@ class SASTOrchestrator:
 
         if not filtered_vulns:
             logger.info("No hay vulnerabilidades HIGH/CRITICAL que procesar")
-            return {
-                "total_tasks": 0,
-                "completed": 0,
-                "failed": 0,
-                "pr_created": 0,
-                "prs": [],
-                "tasks": []
-            }
+            return self._empty_result()
 
         # (Opcional) Limitar a un máximo para pruebas
         MAX_VULNS = 2  # Ajusta según necesidad
@@ -276,7 +284,7 @@ class SASTOrchestrator:
 
         if not model_keys:
             logger.error("No hay modelos configurados para usar")
-            return
+            return self._empty_result()
 
         tasks = []
         for i, vuln in enumerate(filtered_vulns):
@@ -309,11 +317,17 @@ class SASTOrchestrator:
                 task.update_state(TaskState.FAILED)
                 task.error = f"Error creando worktree: {e}"
 
-        # 5. Ejecutar tareas en paralelo (solo las que no fallaron en worktree)
+        # 5. Ejecutar tareas en paralelo con límite de concurrencia para evitar rate limiting
+        semaphore = asyncio.Semaphore(1)  # solo una tarea a la vez
+
+        async def run_with_semaphore(task):
+            async with semaphore:
+                await self._run_single_task(task, dry_run)
+
         agent_tasks = []
         for task in tasks:
             if task.state != TaskState.FAILED:
-                agent_tasks.append(self._run_single_task(task, dry_run))
+                agent_tasks.append(run_with_semaphore(task))
 
         if agent_tasks:
             await asyncio.gather(*agent_tasks, return_exceptions=True)
@@ -332,28 +346,7 @@ class SASTOrchestrator:
             await asyncio.gather(*pr_tasks, return_exceptions=True)
 
         # 7. Generar reporte
-        self._generate_report()
-        # 8. Al final del método, después de _generate_report(), retornar un resumen
-        summary = {
-            "total_tasks": len(self.tasks),
-            "completed": sum(1 for t in self.tasks.values() if t.state == TaskState.COMPLETED),
-            "failed": sum(1 for t in self.tasks.values() if t.state == TaskState.FAILED),
-            "pr_created": sum(1 for t in self.tasks.values() if t.pr_url is not None),
-            "prs": [{"task_id": t.task_id, "pr_url": t.pr_url} for t in self.tasks.values() if t.pr_url],
-            "tasks": [
-                {
-                    "task_id": t.task_id,
-                    "model": t.model_display,
-                    "vuln_id": getattr(t.vulnerability, 'id', 'unknown'),  # seguro
-                    "cwe": getattr(t.vulnerability, 'cwe_id', 'N/A') or 'N/A',  # seguro
-                    "state": t.state.value,
-                    "pr_url": t.pr_url,
-                    "error": t.error
-                }
-                for t in self.tasks.values()
-            ]
-        }
-        return summary
+        return self._generate_report()
 
     async def _create_worktree(self, repo_url: str, base_branch: str, branch_name: str) -> Path:
         """
@@ -369,25 +362,37 @@ class SASTOrchestrator:
         repo_dir = worktrees_base / "repo"
         if not repo_dir.exists():
             logger.info(f"Clonando {repo_url} en {repo_dir}")
+            auth_url = self._get_authenticated_repo_url(repo_url)
             subprocess.run(
-                ["git", "clone", repo_url, str(repo_dir)],
+                ["git", "clone", auth_url, str(repo_dir)],
                 check=True,
-                capture_output=True
+                capture_output=True,
+                text=True
             )
+            # Configurar remote con token para futuros pushes (si ya lo tiene, no hace falta)
+            # Aseguramos que el remote tenga la URL autenticada
+            if self.github_token:
+                subprocess.run(
+                    ["git", "-C", str(repo_dir), "remote", "set-url", "origin", auth_url],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
 
         # Crear el worktree
         logger.info(f"Creando worktree {branch_name} en {worktree_path}")
         subprocess.run(
             ["git", "-C", str(repo_dir), "worktree", "add", "-b", branch_name, str(worktree_path)],
             check=True,
-            capture_output=True
+            capture_output=True,
+            text=True
         )
 
         return worktree_path
 
     def _generate_task_input(self, task: SOTATask) -> Dict:
         return {
-            "model": task.model_display,
+            "model": task.model_key,  # antes era task.model_display
             "vulnerability": {
                 "id": task.vulnerability.id,
                 "file": task.vulnerability.file,
@@ -400,6 +405,10 @@ class SASTOrchestrator:
         }
 
     async def _run_single_task(self, task: SOTATask, dry_run: bool = False):
+        """
+        Ejecuta un agente SOTA en un contenedor Docker para una vulnerabilidad específica.
+        Crea un archivo input.json en el worktree y ejecuta el agente con redirección de stdin.
+        """
         if not self.openrouter_key:
             task.error = f"Falta {OPENROUTER_API_KEY}. Tarea abortada."
             task.update_state(TaskState.FAILED)
@@ -411,40 +420,85 @@ class SASTOrchestrator:
             task.update_state(TaskState.COMPLETED)
             return
 
+        # Preparar el input JSON para el agente
         input_json = self._generate_task_input(task)
         container_name = f"tdh-agent-{task.task_id}"
         task.container_name = container_name
 
+        # Crear archivo input.json en el worktree (accesible desde el contenedor)
+        input_file = task.worktree_path / "input.json"
         try:
+            with open(input_file, 'w') as f:
+                json.dump(input_json, f, indent=2)
+            logger.info(f"📄 Archivo de input creado en {input_file}")
+            
+            # Verificar que el archivo existe
+            if input_file.exists():
+                logger.info(f"✅ El archivo existe, tamaño: {input_file.stat().st_size} bytes")
+            else:
+                logger.error(f"❌ El archivo no existe después de escribirlo")
+                task.error = "No se pudo crear input.json (desapareció)"
+                task.update_state(TaskState.FAILED)
+                return
+        except Exception as e:
+            logger.error(f"Error creando input.json: {e}")
+            task.error = f"No se pudo crear input.json: {e}"
+            task.update_state(TaskState.FAILED)
+            return
+
+        try:
+            # Iniciar contenedor en segundo plano con sleep infinity para mantenerlo vivo
             container = self.docker_client.containers.run(
                 image=DEFAULT_BASE_IMAGE,
-                command=["sota_agent.py"],
+                command=["sleep", "infinity"],
                 name=container_name,
                 detach=True,
                 remove=False,
-                volumes={str(task.worktree_path): {"bind": "/workspace", "mode": "rw"}},
+                volumes={
+                    str(task.worktree_path): {"bind": "/workspace", "mode": "rw"},
+                    # Montar el archivo de configuración del consejo
+                    str(COUNCIL_CONFIG_PATH.absolute()): {"bind": "/etc/tdh/llm_council.yaml", "mode": "ro"}
+                },
                 working_dir="/workspace",
-                stdin_open=True,
                 environment={
-                    "OPENROUTER_API_KEY": self.openrouter_key
+                    "OPENROUTER_API_KEY": self.openrouter_key,
+                    "TDH_COUNCIL_CONFIG": "/etc/tdh/llm_council.yaml"
                 }
             )
             self.active_containers.add(container_name)
             task.update_state(TaskState.CONTAINER_STARTED)
 
-            # Enviar input por stdin
+            # Verificar que el archivo sigue existiendo antes de ejecutar
+            if not input_file.exists():
+                logger.error(f"❌ El archivo input.json desapareció antes de ejecutar el agente")
+                task.error = "input.json desapareció"
+                task.update_state(TaskState.FAILED)
+                return
+
+            # Ejecutar el agente dentro del contenedor, redirigiendo stdin desde el archivo
             exec_result = container.exec_run(
-                "python /usr/local/bin/sota_agent.py",
-                stdin=True,
-                input=json.dumps(input_json).encode()
+                "bash -c 'python /usr/local/bin/sota_agent.py < /workspace/input.json'"
             )
             output = exec_result.output.decode()
             exit_code = exec_result.exit_code
 
+            # Obtener logs completos del contenedor
             logs = container.logs(stdout=True, stderr=True).decode()
             task.result["logs"] = logs
             task.result["output"] = output
             task.result["exit_code"] = exit_code
+
+            # Mostrar logs para depuración
+            logger.error(f"🔍 DEBUG - Salida del agente (primeros 500 chars): {output[:500]}")
+            logger.error(f"🔍 DEBUG - Logs del contenedor (primeros 500 chars): {logs[:500]}")
+
+            # Parsear la salida del agente (se espera JSON)
+            json_output = self._extract_json_from_output(output)
+            if json_output:
+                task.result.update(json_output)
+            else:
+                # Si no hay JSON, al menos guardamos la salida como texto
+                task.result["raw_output"] = output
 
             if exit_code == 0:
                 task.update_state(TaskState.COMPLETED)
@@ -457,6 +511,7 @@ class SASTOrchestrator:
             task.error = str(e)
             logger.exception(f"Error en contenedor para tarea {task.task_id}")
         finally:
+            # Limpiar: eliminar contenedor
             if container_name in self.active_containers:
                 self.active_containers.remove(container_name)
             try:
@@ -464,6 +519,27 @@ class SASTOrchestrator:
                 container.remove(force=True)
             except:
                 pass
+            # No eliminar input.json para depuración (comentado)
+            # try:
+            #     input_file.unlink()
+            # except:
+            #     pass
+
+    def _extract_json_from_output(self, output: str) -> Optional[Dict]:
+        """
+        Extrae el primer bloque JSON válido de la salida.
+        Busca desde el final hacia el principio para encontrar el último JSON.
+        """
+        import re
+        # Patrón para encontrar objetos JSON (no perfecto pero funciona)
+        pattern = r'(\{.*\})'
+        matches = re.findall(pattern, output, re.DOTALL)
+        for match in reversed(matches):
+            try:
+                return json.loads(match)
+            except:
+                continue
+        return None
 
     def _parse_agent_output(self, task: SOTATask) -> Dict:
         output = task.result.get("output", "")
@@ -490,10 +566,40 @@ class SASTOrchestrator:
             repo = self._get_github_repo(repo_url)
             branch_name = task.worktree_path.name
 
+            # Configurar identidad de git
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "config", "user.email", "tdh-bot@example.com"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "config", "user.name", "TDH Bot"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+
+            # Hacer commit de los cambios
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "add", "."],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "commit", "-m", f"Fix {task.vulnerability.id}"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+
+            # Hacer push
             subprocess.run(
                 ["git", "-C", str(task.worktree_path), "push", "-u", "origin", branch_name],
                 check=True,
-                capture_output=True
+                capture_output=True,
+                text=True
             )
 
             pr_title = f"Fix: {task.vulnerability.id} - {task.vulnerability.description[:50]}"
@@ -512,6 +618,9 @@ class SASTOrchestrator:
             task.update_state(TaskState.PR_CREATED)
             logger.info(f"✅ Pull request creado: {pr.html_url}")
 
+        except subprocess.CalledProcessError as e:
+            task.error = f"Error en git: {e.stderr}"
+            logger.exception(f"Error en git para tarea {task.task_id}: {e.stderr}")
         except Exception as e:
             task.error = f"Error creando PR: {e}"
             logger.exception("Error en creación de PR")
