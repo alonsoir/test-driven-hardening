@@ -1,7 +1,3 @@
-Claro, aquí tienes el README.md actualizado y corregido, eliminando el diagrama Mermaid problemático y asegurando que toda la información refleje el estado actual del proyecto.
-
----
-
 ```markdown
 # 🛡️ TDH Engine - Test Driven Hardening
 
