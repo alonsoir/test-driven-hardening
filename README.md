@@ -1,123 +1,211 @@
-# Test Driven Hardening (TDH)
+Claro, aquí tienes el README.md actualizado y corregido, eliminando el diagrama Mermaid problemático y asegurando que toda la información refleje el estado actual del proyecto.
 
-> A scientific methodology for evidence-based security hardening through distributed LLM consensus.
+---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Paper Status](https://img.shields.io/badge/Paper-Pre--print-orange)](papers/theoretical-framework.md)
+```markdown
+# 🛡️ TDH Engine - Test Driven Hardening
 
-## 📖 Overview
+Motor de análisis de seguridad avanzado que combina análisis SAST tradicional con agentes autónomos multi‑SOTA para la detección y **corrección automática** de vulnerabilidades en código.
 
-**Test Driven Hardening (TDH)** is a security remediation framework that applies scientific rigor and test-driven development principles to vulnerability fixing. Each security fix must be:
+## 🏗️ Arquitectura del Proyecto
 
-1. **Empirically validated** through a failing proof-of-concept test
-2. **Peer-reviewed** by a distributed council of LLMs
-3. **Verified** by the same test after remediation
-4. **Documented** in a self-contained, evidence-based artifact
-
-## 🔗 Technical Foundation
-
-TDH builds upon the consensus architecture demonstrated in **[Karpathy's llm-council](https://github.com/karpathy/llm-council)** project, extending it with:
-- **Security-specialized prompts** for vulnerability analysis
-- **Evidence-driven consensus** focused on exploitability validation
-- **Integration with CI/CD pipelines** for automated remediation
-- **Hardening Journal** for institutional learning
-## 🧠 Core Philosophy
-
-- **Evidence Over Opinion**: Every vulnerability must have a reproducible PoC
-- **Distributed Consensus**: Multiple LLMs provide unbiased technical review
-- **Human-as-President**: Engineers make final decisions with full context
-- **Institutional Learning**: Every fix becomes documented, searchable knowledge
-
-## 📚 Papers
-
-- **[Theoretical Framework](papers/theoretical-framework.md)** - Core TDH methodology and architecture
-- **[ML Defender Case Study](papers/ml-defender-case-study.md)** - Empirical validation in production
-
-## 🏗️ Architecture Components
-
-| Component | Purpose | Status |
-|-----------|---------|--------|
-| **LLM Council** | Distributed consensus through multiple AI models | Designed |
-| **Hardening Journal** | Institutional memory via vector database | Designed |
-| **TDH Agent** | Automated PR generation with evidence | Designed |
-| **Telemetry System** | Continuous improvement through metrics | Designed |
-
-## 🔬 Origin & Validation
-
-TDH was conceived and empirically validated during the development of the **ML Defender** aka aegisIDS intrusion detection system, specifically through the resolution of ISSUE-003 (thread-local FlowManager bug). The methodology demonstrated:
-
-- ✅ **4× performance improvement** (3.69μs → 0.93μs)
-- ✅ **100% feature recovery** (11/142 → 142/142 features)
-- ✅ **Unanimous LLM consensus** (5/5 models agreement)
-- ✅ **Scientific validation** (ThreadSanitizer, benchmarks, PoC tests)
-
-## 🚀 Getting Started
-
-### For Researchers
-1. Read the [theoretical framework](papers/theoretical-framework.md)
-2. Review the [case study](papers/ml-defender-case-study.md) for empirical validation
-3. Check [CONTRIBUTING.md](docs/CONTRIBUTING.md) for collaboration guidelines
-
-### For Practitioners
-TDH is designed for gradual adoption:
-1. Start by requiring PoC tests for critical vulnerabilities
-2. Introduce multi-reviewer processes (human or AI)
-3. Document fixes with evidence and context
-4. Consider implementing a Hardening Journal for institutional learning
-
-### **TDH Engine – Multi-SOTA Hardening Flow**
-
-```mermaid
-flowchart TD
-    A[Inicio: Vulnerabilidad detectada / análisis inicial] --> B[Engine asigna vulnerabilidad a SOTA 1]
-    B --> C[SOTA recibe prompt inicial y crea PoC test]
-    C --> D[PoC test compilado y ejecutado → demuestra vulnerabilidad (ROJO/VERDE)]
-    D --> E[Engine recibe PoC y lo comparte con otras SOTAs]
-    E --> F[Otras SOTAs verifican el PoC, validación reproducible]
-    F --> G[SOTAs generan fix individual según su estrategia]
-    G --> H[Engine coordina logs, estado de cada SOTA y posibles interdependencias]
-    H --> I[Engine aplica fix en worktree y genera commit]
-    I --> J[Pull Request automática con: fix, test, logs y análisis de SOTA]
-    J --> K[Revisión humana final y decisión de merge]
-    K --> L[Actualización del Hardening Journal / aprendizaje institucional]
+```
+engine-prototype/
+├── tdh_unified.py                 # 🎛️ CLI unificada (punto de entrada principal)
+├── src/
+│   ├── core/
+│   │   ├── sast_orchestrator.py   # 🧠 Orquestador multi‑SOTA (worktrees, contenedores, PRs)
+│   │   ├── sast_pipeline.py       # 🔍 Pipeline SAST (cppcheck, flawfinder, bandit, semgrep, trivy)
+│   │   └── docker_manager.py      # 🐳 Gestión de contenedores (legacy)
+│   └── ...
+├── docker/
+│   ├── Dockerfile.base            # 📦 Imagen base con herramientas y sota_agent.py
+│   └── sota_agent.py              # 🤖 Agente autónomo SOTA (test/fix/document)
+├── config/
+│   ├── llm_council.yaml           # ⚙️ Configuración de modelos y prompts
+│   └── sast_config.yaml           # ⚙️ Configuración de herramientas SAST
+├── results/                       # 📊 Reportes generados
+├── logs/                          # 📝 Logs de ejecución
+├── vagrant/                       # 🖥️ Entorno de desarrollo con Vagrant
+└── Makefile                       # 🔧 Automatización completa
 ```
 
-### **Leyenda / Conceptos clave**
+## 🔄 Flujo de Orquestación Multi‑SOTA
 
-* **PoC test (Prueba de concepto)**:
+El orquestador ejecuta el siguiente proceso de forma completamente autónoma:
 
-  * Compilable y ejecutable en lenguaje base (C/C++ actualmente).
-  * **ROJO** → vulnerabilidad corregida; **VERDE** → vulnerabilidad presente.
+1. **Análisis SAST** con herramientas profesionales (cppcheck, flawfinder, bandit, semgrep, trivy).
+2. **Filtrado** de vulnerabilidades HIGH/CRITICAL (según configuración).
+3. **Asignación round‑robin** de modelos del consejo (definidos en `llm_council.yaml`).
+4. **Creación de worktrees aislados** por vulnerabilidad (ramas únicas con timestamp).
+5. **Lanzamiento de contenedores Docker** efímeros con `sota_agent.py`.
+6. **Ejecución autónoma del agente**:
+   - Diseña y prueba un test que reproduzca la vulnerabilidad.
+   - Diseña y aplica un fix, verificando que el test pasa.
+   - Documenta el cambio.
+7. **Commit, push y creación de Pull Request** en GitHub.
+8. **Generación de reporte** JSON con resultados y enlaces a los PRs.
 
-* **SOTA (State-of-the-Art AI model)**:
+## 🚀 Características Principales
 
-  * Genera fixes, tests y documentación.
-  * Se comunica con engine mediante archivos de log o `chat-incoming`.
-  * Interacción multi-SOTA gestionada por engine.
+- **Análisis SAST completo** con 5+ herramientas profesionales.
+- **Filtrado inteligente** por severidad (solo HIGH/CRITICAL).
+- **Múltiples modelos SOTA** configurables (OpenRouter).
+- **Worktrees aislados** por vulnerabilidad.
+- **Contenedores Docker** limpios y efímeros.
+- **Agente autónomo** que itera test/fix hasta éxito.
+- **Pull Requests automáticos** con explicación, test y fix.
+- **Modo `--dry-run`** para pruebas sin interacción externa.
+- **Reportes detallados** en JSON y consola.
 
-* **Engine**:
+## ⚡ Instalación Rápida
 
-  * Coordina worktrees, contenedores, estado de cada SOTA y comunicación.
-  * Propaga PoC y fixes entre SOTAs.
-  * Automatiza commits y creación de PRs, pero no toma decisiones de análisis.
+### Con Vagrant (recomendado)
+```bash
+git clone https://github.com/alonsoir/test-driven-hardening.git
+cd test-driven-hardening/engine-prototype
+make vagrant-up      # Crea y provisiona la VM
+make vagrant-ssh     # Conéctate a la VM
+cd /home/vagrant/tdh-engine
+```
 
-* **Human-in-the-loop**:
+### Manual (en máquina local)
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+make build-base      # Construye imagen Docker tdh-base
+```
 
-  * Revisión final de PR.
-  * Decide qué fixes se aceptan, basándose en evidencia reproducible.
+## 🔑 Configuración
 
-## 📊 Status
+### 1. Archivo `.env` (en la raíz del proyecto)
+```bash
+OPENROUTER_API_KEY=sk-or-v1-...
+GITHUB_TOKEN=ghp_...
+```
 
-**Current**: Pre-print research framework  
-**Goal**: Production-ready implementation  
-**Validation**: Empirical evidence from ML Defender ISSUE-003  
+### 2. Consejo de modelos (`config/llm_council.yaml`)
+```yaml
+llm_configs:
+  claude-3-5-sonnet:
+    provider: openrouter
+    model: anthropic/claude-3.5-sonnet
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 1
 
-## 📄 License
+  gpt-4-turbo:
+    provider: openrouter
+    model: openai/gpt-4-turbo
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 2
 
-This research framework is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+  deepseek-coder:
+    provider: openrouter
+    model: deepseek/deepseek-coder
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 3
+```
 
-## 🙏 Acknowledgments
+## 🎯 Uso
 
-- Concept developed through collaboration with DeepSeek AI
-- Empirically validated in the ML Defender pipeline
-- Inspired by scientific methodology and test-driven development
+### Análisis SAST puro (sin agentes)
+```bash
+tdh_unified.py sast-real https://github.com/usuario/repo.git
+```
+
+### Orquestación multi‑SOTA completa (con fixes y PRs)
+```bash
+# Modo dry‑run (solo simula)
+tdh_unified.py sast-orchestrated https://github.com/usuario/repo.git --dry-run
+
+# Modo real (genera PRs)
+tdh_unified.py sast-orchestrated https://github.com/usuario/repo.git
+```
+
+### Opciones adicionales
+```bash
+# Limitar modelos a usar
+tdh_unified.py sast-orchestrated https://github.com/usuario/repo.git --council claude-3-5-sonnet gpt-4-turbo
+
+# Construir imagen base
+tdh_unified.py build-base
+```
+
+## 📋 Ejemplo Completo
+
+```bash
+# 1. Activar entorno (si no se está en la VM)
+source venv/bin/activate
+
+# 2. Ejecutar orquestación real
+tdh_unified.py sast-orchestrated https://github.com/tu-usuario/test-zeromq-c-.git
+```
+
+Salida esperada:
+```
+🚀 ORQUESTACIÓN MULTI‑SOTA para https://github.com/tu-usuario/test-zeromq-c-.git
+✅ SAST completado. 1183 vulnerabilidades encontradas.
+Vulnerabilidades HIGH/CRITICAL: 14
+[TASK:a1b2c3] Estado → worktree_created
+[TASK:d4e5f6] Estado → worktree_created
+[TASK:a1b2c3] Estado → container_started
+[SOTA:claude-3.5-sonnet][STATE:test_designing] Starting test design...
+...
+✅ Pull request creado: https://github.com/tu-usuario/test-zeromq-c-.git/pull/1
+✅ Pull request creado: https://github.com/tu-usuario/test-zeromq-c-.git/pull/2
+📊 Reporte guardado en results/orchestration_20260214_123456.json
+```
+
+## 🐳 Desarrollo con Vagrant
+
+### Comandos útiles (desde el host)
+```bash
+make vagrant-up        # Inicia VM
+make vagrant-ssh       # Conecta a VM
+make vagrant-halt      # Detiene VM
+make vagrant-destroy   # Destruye VM
+make vm-example        # Ejecuta ejemplo dry‑run dentro de la VM
+```
+
+## 🔧 Solución de Problemas
+
+### Error 429 / 402 en OpenRouter
+- Añade crédito a tu cuenta (https://openrouter.ai/settings/limits).
+- Usa modelos gratuitos verificados (ej. `google/gemma-3-27b-it:free`).
+- Reduce concurrencia (el orquestador ya usa semáforo `asyncio.Semaphore(1)`).
+
+### Error de autenticación GitHub
+- Verifica que `GITHUB_TOKEN` tiene permisos `repo`.
+- Comprueba que el token está en el `.env` y se carga correctamente.
+
+### Error en el agente (código 1)
+- Revisa los logs DEBUG en la salida del orquestador.
+- Asegura que `sota_agent.py` tiene permisos de ejecución en la imagen.
+- Verifica que el modelo especificado en `input.json` coincide con una clave en `llm_council.yaml`.
+
+## 📊 Reportes
+
+Cada ejecución genera un JSON en `results/` con:
+- Total de tareas, completadas, fallidas, PRs creados.
+- Lista detallada por tarea: modelo, vulnerabilidad, estado, URL del PR, error.
+
+## 🤝 Contribuir
+
+1. Haz un fork del repositorio.
+2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`).
+3. Realiza los cambios y prueba con `make vm-example`.
+4. Envía un Pull Request.
+
+## 📄 Licencia
+
+MIT License – Ver [LICENSE](LICENSE) para más detalles.
+
+---
+
+**¿Listo para automatizar la corrección de vulnerabilidades?** ⭐ Dale una estrella en GitHub y únete a la revolución del hardening autónomo.
+```
+
