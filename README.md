@@ -3,6 +3,8 @@
 
 Motor de análisis de seguridad avanzado que combina análisis SAST tradicional con agentes autónomos multi‑SOTA para la detección y **corrección automática** de vulnerabilidades en código.
 
+Prototipo Python. La idea es crear un engine c++ optimizado.
+
 ## 🏗️ Arquitectura del Proyecto
 
 
