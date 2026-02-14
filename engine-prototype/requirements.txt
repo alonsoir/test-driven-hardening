@@ -1,18 +1,15 @@
-# engine-prototype/requirements.txt
-PyYAML>=6.0
-semgrep>=1.0.0
-bandit>=1.7.0
-safety>=2.0.0
-xmltodict>=0.13.0
-rich>=13.0.0
+# Core
+docker>=6.1.0
+aiofiles>=23.2.0
+python-dotenv>=1.0.0
 
-# Para github_analyzer.py (si lo mantenemos)
-gitpython>=3.1.0
+# SOTA Agent (dentro del contenedor ya está, pero para el host/VM)
 requests>=2.31.0
-click>=8.1.0
-pygments>=2.15.0
+pyyaml>=6.0.1
 
-# requirements.txt
-aiohttp>=3.9.0
-requests>=2.31.0
-gitpython>=3.1.0
+# GitHub API
+PyGithub>=2.1.0
+
+# SAST (opcional, algunas herramientas ya están en el contenedor)
+semgrep>=1.44.0
+bandit>=1.7.5

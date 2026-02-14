@@ -1,0 +1,88 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  # Box oficial de Ubuntu
+  config.vm.box = "ubuntu/jammy64"
+  config.vm.hostname = "tdh-engine-dev"
+  
+  # Puerto SSH
+  config.vm.network "forwarded_port", guest: 22, host: 2223, id: "ssh"
+  
+  # IMPORTANTE: Usar VirtualBox shared folders en lugar de NFS para OSX
+  # VirtualBox funciona mejor que NFS en OSX sin plugins adicionales
+  project_root = File.expand_path("..", __dir__)
+
+  config.vm.synced_folder project_root, "/home/vagrant/tdh-engine",
+    type: "virtualbox",
+    mount_options: ["dmode=775", "fmode=664"]
+  
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "tdh-engine-ubuntu"
+    vb.memory = 8192
+    vb.cpus = 4
+    vb.customize ["modifyvm", :id, "--ioapic", "on"]
+    vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
+    vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
+    vb.customize ["modifyvm", :id, "--accelerate2dvideo", "on"]
+    vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
+  end
+  
+  # Scripts de provisionamiento (ajusta las rutas si es necesario)
+  config.vm.provision "shell", path: "provision/01-base.sh", privileged: true
+  config.vm.provision "shell", path: "provision/02-docker.sh", privileged: true
+  config.vm.provision "shell", path: "provision/03-tools.sh", privileged: true
+  config.vm.provision "shell", path: "provision/04-tdh.sh", privileged: false
+  
+  # Configuración de herramientas SAST
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    echo "🔧 Instalando herramientas SAST..."
+    
+    # Instalar cppcheck
+    apt-get install -y cppcheck
+    
+    # Instalar flawfinder
+    apt-get install -y flawfinder
+    
+    # Instalar trivy
+    apt-get install -y wget apt-transport-https gnupg lsb-release
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
+    echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
+    apt-get update
+    apt-get install -y trivy
+    
+    echo "✅ Herramientas SAST instaladas"
+  SHELL
+  
+  # Configuración automática del entorno
+  config.vm.provision "shell", run: "always", inline: <<-SHELL
+    echo "🚀 Configurando TDH Engine..."
+    
+    cd /home/vagrant/tdh-engine
+    
+    # Crear entorno virtual
+    if [ ! -d "venv" ]; then
+      python3 -m venv venv
+    fi
+    
+    # Instalar dependencias
+    source venv/bin/activate
+    pip install --upgrade pip
+    
+    # Instalar requirements si existe
+    if [ -f "requirements.txt" ]; then
+      pip install -r requirements.txt
+    else
+      pip install docker aiofiles aiohttp asyncio
+    fi
+    
+    # Crear alias
+    cat << 'EOF' >> /home/vagrant/.bashrc
+alias tdh='cd /home/vagrant/tdh-engine && source venv/bin/activate && python tdh_unified.py'
+alias tdh-help='tdh --help'
+alias tdh-example='tdh sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git'
+EOF
+    
+    echo "✨ Configuración completada"
+  SHELL
+end

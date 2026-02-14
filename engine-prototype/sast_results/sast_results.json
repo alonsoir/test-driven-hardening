@@ -1,0 +1,54 @@
+{
+  "issues": [
+    {
+      "tool": "cppcheck",
+      "rule_id": "nullPointer",
+      "severity": "CRITICAL",
+      "confidence": "HIGH",
+      "message": "Possible null pointer dereference",
+      "file": "src/main.c",
+      "line": 42,
+      "cwe": "CWE-476",
+      "owasp": "A9:2021-Security Logging and Monitoring Failures",
+      "code_snippet": "    char *ptr = NULL;\n    *ptr = 'a';  // VULNERABLE"
+    },
+    {
+      "tool": "cppcheck",
+      "rule_id": "bufferAccessOutOfBounds",
+      "severity": "HIGH",
+      "confidence": "MEDIUM",
+      "message": "Buffer access out of bounds",
+      "file": "src/utils.c",
+      "line": 123,
+      "cwe": "CWE-119",
+      "owasp": "A8:2021-Software and Data Integrity Failures",
+      "code_snippet": "    char buffer[10];\n    buffer[15] = 'x';  // VULNERABLE"
+    },
+    {
+      "tool": "bandit",
+      "rule_id": "B301",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "message": "Pickle module used, possible deserialization attack",
+      "file": "api/deserialize.py",
+      "line": 15,
+      "cwe": "CWE-502",
+      "owasp": "A8:2021-Software and Data Integrity Failures",
+      "code_snippet": "import pickle\npickle.loads(user_input)  # VULNERABLE"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "by_severity": {
+      "CRITICAL": 1,
+      "HIGH": 1,
+      "MEDIUM": 1
+    },
+    "by_tool": {
+      "cppcheck": 2,
+      "bandit": 1
+    }
+  },
+  "repository": "/var/folders/0x/gmzly6vn2f7ggfk47bdcsbnc0000gn/T/tmpe7wsza0t/repo",
+  "timestamp": "2026-02-07T11:27:44.141507"
+}

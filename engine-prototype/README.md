@@ -1,328 +1,204 @@
-# 🛡️ TDH Engine - Test Driven Hardening Engine
+```markdown
+# 🛡️ TDH Engine - Test Driven Hardening
 
-Motor de análisis de seguridad avanzado que combina análisis AST tradicional con herramientas SAST profesionales para detección integral de vulnerabilidades en código.
+Motor de análisis de seguridad avanzado que combina análisis SAST tradicional con agentes autónomos multi‑SOTA para la detección y **corrección automática** de vulnerabilidades en código.
 
 ## 🏗️ Arquitectura del Proyecto
 
 ```
 engine-prototype/
-├── github_analyzer.py            # 🔍 Analizador tradicional AST (script independiente)
-├── src/core/
-│   ├── sast_orchestrator.py      # 🎛️ Nuevo orquestador principal de SAST
-│   ├── config_validator.py       # ✅ Validador de configuración
-│   └── (próximamente: integración con github_analyzer)
+├── tdh_unified.py                 # 🎛️ CLI unificada (punto de entrada principal)
+├── src/
+│   ├── core/
+│   │   ├── sast_orchestrator.py   # 🧠 Orquestador multi‑SOTA (worktrees, contenedores, PRs)
+│   │   ├── sast_pipeline.py       # 🔍 Pipeline SAST (cppcheck, flawfinder, bandit, semgrep, trivy)
+│   │   └── docker_manager.py      # 🐳 Gestión de contenedores (legacy)
+│   └── ...
+├── docker/
+│   ├── Dockerfile.base            # 📦 Imagen base con herramientas y sota_agent.py
+│   └── sota_agent.py              # 🤖 Agente autónomo SOTA (test/fix/document)
 ├── config/
-│   ├── tdh_config.yaml           # ⚙️ Configuración principal
-│   └── sast_tools.yaml           # 🛠️ Configuración de herramientas SAST
-├── scripts/
-│   ├── test_sast.py              # 🧪 Pruebas del sistema SAST
-│   ├── test_sast_simple.py       # 🧪 Prueba simplificada
-│   └── install_sast_tools.sh     # 📦 Instalador de herramientas
-├── requirements.txt              # 📦 Dependencias del analizador tradicional
-├── requirements-dev.txt          # 📦 Dependencias de desarrollo
-├── reports/                      # 📊 Reportes generados
-├── logs/                         # 📝 Logs de análisis
-└── Makefile                      # 🔧 Automatización completa
+│   ├── llm_council.yaml           # ⚙️ Configuración de modelos y prompts
+│   └── sast_config.yaml            # ⚙️ Configuración de herramientas SAST
+├── results/                        # 📊 Reportes generados
+├── logs/                           # 📝 Logs de ejecución
+├── vagrant/                         # 🖥️ Entorno de desarrollo con Vagrant
+└── Makefile                         # 🔧 Automatización completa
 ```
 
-## 🔄 Dos Enfoques de Análisis
+## 🔄 Flujo de Orquestación Multi‑SOTA
 
-### 1. **SAST Orchestrator (Nuevo - Recomendado)**
-Sistema modular que integra múltiples herramientas SAST profesionales:
-- **Orquestación inteligente** de herramientas especializadas
-- **Configuración centralizada** en YAML
-- **Soporte multi-lenguaje** con herramientas nativas
-- **Extensible** con nuevas herramientas
-
-### 2. **GitHub Analyzer (Tradicional)**
-Script independiente para análisis AST básico:
-- **Análisis AST** para Python y C/C++
-- **Clonado automático** de repositorios GitHub
-- **Formatos múltiples**: texto, JSON, HTML
-- **Compatibilidad** con el sistema anterior
+1. **Análisis SAST** con herramientas profesionales (cppcheck, flawfinder, bandit, semgrep, trivy).
+2. **Filtrado** de vulnerabilidades HIGH/CRITICAL (configurable en `llm_council.yaml`).
+3. **Asignación round‑robin** de modelos del consejo (ej. claude-3.5-sonnet, gpt-4-turbo, deepseek-coder).
+4. **Creación de worktrees aislados** por vulnerabilidad (ramas únicas con timestamp).
+5. **Lanzamiento de contenedores Docker** efímeros con `sota_agent.py`.
+6. **Ejecución autónoma del agente**:
+   - Diseña y prueba un test que reproduzca la vulnerabilidad.
+   - Diseña y aplica un fix, verificando que el test pasa.
+   - Documenta el cambio.
+7. **Commit, push y creación de Pull Request** en GitHub.
+8. **Generación de reporte** JSON con resultados y enlaces a los PRs.
 
 ## 🚀 Características Principales
 
-### 🔍 **SAST Orchestrator (Moderno)**
-- **Integración profesional** con semgrep, bandit, cppcheck, etc.
-- **Configuración YAML** centralizada
-- **Detección por severidad** configurable
-- **Sistema de exclusiones** avanzado
-- **Reportes JSON/HTML** para CI/CD
-- **Entorno virtual** gestionado por Makefile
-
-### 📦 **GitHub Analyzer (Tradicional)**
-- **Análisis AST** para Python y C/C++
-- **Clonado automático** de repositorios
-- **Detección de vulnerabilidades** comunes
-- **Cache local** para análisis repetidos
-- **Formatos**: texto, JSON, HTML
+- **Análisis SAST completo** con 5+ herramientas profesionales.
+- **Filtrado inteligente** por severidad (solo HIGH/CRITICAL).
+- **Múltiples modelos SOTA** configurables (OpenRouter).
+- **Worktrees aislados** por vulnerabilidad.
+- **Contenedores Docker** limpios y efímeros.
+- **Agente autónomo** que itera test/fix hasta éxito.
+- **Pull Requests automáticos** con explicación, test y fix.
+- **Modo `--dry-run`** para pruebas sin interacción externa.
+- **Reportes detallados** en JSON y consola.
 
 ## ⚡ Instalación Rápida
 
-### Opción A: Sistema SAST Moderno (Recomendado)
+### Con Vagrant (recomendado)
 ```bash
-cd engine-prototype
-make init                    # 🎯 Inicializa entorno completo
-source venv/bin/activate     # 🔌 Activa entorno virtual
+git clone https://github.com/alonsoir/test-driven-hardening.git
+cd test-driven-hardening/engine-prototype
+make vagrant-up      # Crea y provisiona la VM
+make vagrant-ssh     # Conéctate a la VM
+cd /home/vagrant/tdh-engine
 ```
 
-### Opción B: Analizador Tradicional
+### Manual (en máquina local)
 ```bash
-pip install -r requirements.txt  # Instala dependencias básicas
-python github_analyzer.py --help # Verifica funcionamiento
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+make build-base      # Construye imagen Docker tdh-base
 ```
 
-## 🎯 Uso Rápido
+## 🔑 Configuración
 
-### Usando el Nuevo SAST Orchestrator
+### 1. Archivo `.env` (en la raíz del proyecto)
 ```bash
-# Analizar directorio actual
-python -m src.core.sast_orchestrator .
-
-# Con configuración personalizada
-python -m src.core.sast_orchestrator /ruta/proyecto
-
-# Usar script de prueba simplificado
-python scripts/test_sast_simple.py
-
-# Ejecutar a través del Makefile
-make run
+OPENROUTER_API_KEY=sk-or-v1-...
+GITHUB_TOKEN=ghp_...
 ```
 
-### Usando el GitHub Analyzer Tradicional
-```bash
-# Analizar repositorio GitHub
-python github_analyzer.py analyze usuario/repositorio
-
-# Con diferentes formatos de salida
-python github_analyzer.py analyze torvalds/linux --output json
-python github_analyzer.py analyze OWASP/CheatSheetSeries --output html
-
-# Analizar repositorio local
-python github_analyzer.py local /ruta/al/repositorio
-```
-
-## ⚙️ Configuración
-
-### Configuración SAST Moderna (`config/sast_tools.yaml`)
+### 2. Consejo de modelos (`config/llm_council.yaml`)
 ```yaml
-tools:
-  semgrep:
-    enabled: true
-    command: "semgrep"
-    args:
-      base: ["--json", "--config", "auto"]
-    file_extensions: [".py", ".js", ".java", ".c", ".cpp"]
-  
-  bandit:
-    enabled: true
-    command: "bandit"
-    args:
-      base: ["-f", "json", "--skip", "B101,B102"]
-    file_extensions: [".py"]
+llm_configs:
+  claude-3-5-sonnet:
+    provider: openrouter
+    model: anthropic/claude-3.5-sonnet
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 1
 
-exclusions:
-  global:
-    directories:
-      - "**/node_modules/**"
-      - "**/.git/**"
-      - "**/__pycache__/**"
+  gpt-4-turbo:
+    provider: openrouter
+    model: openai/gpt-4-turbo
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 2
+
+  deepseek-coder:
+    provider: openrouter
+    model: deepseek/deepseek-coder
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 3
 ```
 
-### Migración del Sistema Tradicional
-Si vienes usando `github_analyzer.py`, el nuevo sistema ofrece:
-- **Más herramientas** de análisis (semgrep, cppcheck, etc.)
-- **Mejor configuración** (YAML vs. argumentos CLI)
-- **Reportes más detallados** con estadísticas
-- **Integración CI/CD** más robusta
+## 🎯 Uso
 
-## 📋 Comandos Makefile (Productividad)
-
-### 🏗️ Configuración
+### Análisis SAST puro (sin agentes)
 ```bash
-make setup          # Configura entorno básico
-make setup-dev      # Configura entorno de desarrollo completo
-make install-tools  # Instala herramientas SAST
-make check-env      # Verifica entorno
-make check-tools    # Verifica herramientas instaladas
+tdh_unified.py sast-real https://github.com/usuario/repo.git
 ```
 
-### 🧪 Pruebas
+### Orquestación multi‑SOTA completa (con fixes y PRs)
 ```bash
-make test           # Ejecuta todas las pruebas
-make test-sast      # Prueba específica de SAST
-make test-unit      # Pruebas unitarias
+# Modo dry‑run (solo simula)
+tdh_unified.py sast-orchestrated https://github.com/usuario/repo.git --dry-run
+
+# Modo real (genera PRs)
+tdh_unified.py sast-orchestrated https://github.com/usuario/repo.git
 ```
 
-### 🚀 Ejecución
+### Opciones adicionales
 ```bash
-make run            # Ejecuta SAST en directorio actual
-make lint           # Ejecuta linters
-make format         # Formatea código automáticamente
+# Limitar modelos a usar
+tdh_unified.py sast-orchestrated https://github.com/usuario/repo.git --council claude-3-5-sonnet gpt-4-turbo
+
+# Construir imagen base
+tdh_unified.py build-base
 ```
 
-### 🧹 Mantenimiento
+## 📋 Ejemplo Completo
+
 ```bash
-make clean          # Limpia archivos temporales
-make clean-reports  # Limpia reportes
-make distclean      # Limpieza completa (incluye venv)
+# 1. Activar entorno (si no se está en la VM)
+source venv/bin/activate
+
+# 2. Ejecutar orquestación real
+tdh_unified.py sast-orchestrated https://github.com/tu-usuario/test-zeromq-c-.git
 ```
 
-## 📊 Formatos de Salida
-
-### SAST Orchestrator (JSON Moderno)
-```json
-{
-  "metadata": {
-    "project": "test-driven-hardening",
-    "scan_id": "20240115_143022",
-    "tools_used": ["semgrep", "bandit"],
-    "total_issues": 12
-  },
-  "statistics": {
-    "total_files": 45,
-    "issues_by_severity": {
-      "CRITICAL": 2,
-      "HIGH": 3,
-      "MEDIUM": 7
-    }
-  }
-}
+Salida esperada:
+```
+🚀 ORQUESTACIÓN MULTI‑SOTA para https://github.com/tu-usuario/test-zeromq-c-.git
+✅ SAST completado. 1183 vulnerabilidades encontradas.
+Vulnerabilidades HIGH/CRITICAL: 14
+[TASK:a1b2c3] Estado → worktree_created
+[TASK:d4e5f6] Estado → worktree_created
+[TASK:a1b2c3] Estado → container_started
+[SOTA:claude-3.5-sonnet][STATE:test_designing] Starting test design...
+...
+✅ Pull request creado: https://github.com/tu-usuario/test-zeromq-c-.git/pull/1
+✅ Pull request creado: https://github.com/tu-usuario/test-zeromq-c-.git/pull/2
+📊 Reporte guardado en results/orchestration_20260214_123456.json
 ```
 
-### GitHub Analyzer (JSON Tradicional)
-```json
-{
-  "repository": "torvalds/linux",
-  "analysis_date": "2024-01-15",
-  "languages": ["C", "Python"],
-  "vulnerabilities": [...]
-}
-```
+## 🐳 Desarrollo con Vagrant
 
-## 🔍 Qué Detecta Cada Sistema
-
-### SAST Orchestrator (Herramientas Especializadas)
-- **semgrep**: 1000+ reglas comunitarias para múltiples lenguajes
-- **bandit**: Vulnerabilidades específicas de Python
-- **cppcheck**: Análisis estático profundo para C/C++
-- **safety**: Dependencias Python vulnerables
-- **flawfinder**: Fallos de seguridad en C/C++
-
-### GitHub Analyzer (AST Tradicional)
-- **Python**: `eval()`, `exec()`, `subprocess`, credenciales hardcodeadas
-- **C/C++**: `strcpy()`, `gets()`, `system()`, memory leaks
-- **Path traversal**: `../`, rutas relativas
-- **Inyecciones**: comandos, SQL (básico)
-
-## 🎨 Integración CI/CD
-
-### Para el Nuevo SAST Orchestrator
-```yaml
-# GitHub Actions
-- name: Run TDH SAST Scan
-  run: |
-    cd engine-prototype
-    make ci-setup
-    make run
-```
-
-### Para el GitHub Analyzer Tradicional
-```yaml
-# GitHub Actions
-- name: Run GitHub Analyzer
-  run: |
-    pip install -r engine-prototype/requirements.txt
-    python engine-prototype/github_analyzer.py analyze ${{ github.repository }} --output json
+### Comandos útiles (desde el host)
+```bash
+make vagrant-up        # Inicia VM
+make vagrant-ssh       # Conecta a VM
+make vagrant-halt      # Detiene VM
+make vagrant-destroy   # Destruye VM
+make vm-example        # Ejecuta ejemplo dry‑run dentro de la VM
 ```
 
 ## 🔧 Solución de Problemas
 
-### Problemas Comunes del SAST Orchestrator
-```bash
-# Error: No module named 'yaml'
-make setup  # Reinstala dependencias
+### Error 429 / 402 en OpenRouter
+- Añade crédito a tu cuenta (https://openrouter.ai/settings/limits).
+- Usa modelos gratuitos verificados (ej. `google/gemma-3-27b-it:free`).
+- Reduce concurrencia (el orquestador ya usa semáforo `asyncio.Semaphore(1)`).
 
-# Error: Herramienta no encontrada
-make install-tools  # Instala herramientas SAST
+### Error de autenticación GitHub
+- Verifica que `GITHUB_TOKEN` tiene permisos `repo`.
+- Comprueba que el token está en el `.env` y se carga correctamente.
 
-# Error: Entorno virtual no activado
-source venv/bin/activate
-```
+### Error en el agente (código 1)
+- Revisa los logs DEBUG en la salida del orquestador.
+- Asegura que `sota_agent.py` tiene permisos de ejecución en la imagen.
+- Verifica que el modelo especificado en `input.json` coincide con una clave en `llm_council.yaml`.
 
-### Problemas del GitHub Analyzer
-```bash
-# Error: ModuleNotFoundError
-pip install -r requirements.txt
+## 📊 Reportes
 
-# Error: Repository not found
-# Verifica que el repositorio existe y es público
-```
-
-## 🚀 Roadmap y Evolución
-
-### Evolución del Proyecto
-1. **Fase 1**: `github_analyzer.py` (AST tradicional) ✅
-2. **Fase 2**: `SASTOrchestrator` (herramientas SAST) 🚧 En desarrollo
-3. **Fase 3**: Integración LLM para fixes automáticos ⏳ Próximo
-4. **Fase 4**: Dashboard web y API REST ⏳ Futuro
-
-### Compatibilidad
-- **El nuevo sistema NO reemplaza** inmediatamente el antiguo
-- **Ambos pueden coexistir** durante la transición
-- **Se recomienda migrar** al nuevo sistema para proyectos nuevos
-- **El sistema tradicional** se mantendrá para compatibilidad
-
-## 📚 Recursos Adicionales
-
-### Para el Nuevo Sistema SAST
-- [Configuración SAST](config/sast_tools.yaml) - Configuración de herramientas
-- [SAST Orchestrator](src/core/sast_orchestrator.py) - Código principal
-- [Scripts de prueba](scripts/) - Ejemplos de uso
-
-### Para el Sistema Tradicional
-- [GitHub Analyzer](github_analyzer.py) - Script principal
-- [Ejemplos de uso](#) en el README original
-- [Documentación AST] en comentarios del código
+Cada ejecución genera un JSON en `results/` con:
+- Total de tareas, completadas, fallidas, PRs creados.
+- Lista detallada por tarea: modelo, vulnerabilidad, estado, URL del PR, error.
 
 ## 🤝 Contribuir
 
-### Desarrollo del SAST Orchestrator
-```bash
-# 1. Clona y configura
-git clone https://github.com/alonsoir/test-driven-hardening.git
-cd test-driven-hardening/engine-prototype
-make init
-
-# 2. Desarrolla nuevas funcionalidades
-# 3. Ejecuta pruebas
-make test
-
-# 4. Envía PR
-```
-
-### Mejoras al GitHub Analyzer
-- El código está en `github_analyzer.py`
-- Usa issues para reportar bugs
-- PRs son bienvenidos para mejoras de compatibilidad
+1. Haz un fork del repositorio.
+2. Crea una rama (`git checkout -b feature/nueva-funcionalidad`).
+3. Realiza los cambios y prueba con `make vm-example`.
+4. Envía un Pull Request.
 
 ## 📄 Licencia
 
-MIT License - Ver [LICENSE](LICENSE) para más detalles.
-
-## 🙏 Agradecimientos
-
-- **University of Extremadura** por la investigación académica
-- **Comunidad Open Source** por herramientas como semgrep, bandit, cppcheck
-- **GitHub** por la API y repositorios públicos
-- **Contribuidores** que hacen posible este proyecto
+MIT License – Ver [LICENSE](LICENSE) para más detalles.
 
 ---
 
-**¿Preguntas o problemas?** 
-- 📖 Consulta la [Wiki](https://github.com/alonsoir/test-driven-hardening/wiki)
-- 🐛 Reporta [Issues](https://github.com/alonsoir/test-driven-hardening/issues)
-- 💬 Únete a [Discussions](https://github.com/alonsoir/test-driven-hardening/discussions)
-
-**¿Te gusta el proyecto?** ⭐ Dale una estrella en GitHub para apoyar el desarrollo.
+**¿Listo para automatizar la corrección de vulnerabilidades?** ⭐ Dale una estrella en GitHub y únete a la revolución del hardening autónomo.
+```

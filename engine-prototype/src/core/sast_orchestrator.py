@@ -1,969 +1,684 @@
-# engine-prototype/src/core/sast_orchestrator.py
+#!/usr/bin/env python3
+"""
+Orquestador SAST Multi‑SOTA con Worktrees y Pull Requests.
+Carga credenciales desde un archivo .env para mayor seguridad.
+"""
+
+import asyncio
+import json
+import logging
+import os
+import re
+import sys
+import uuid
 import yaml
 import subprocess
-import json
 import tempfile
-import os
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-import xml.etree.ElementTree as ET
+import shutil
+from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional, Any, Set
 
+# Intentamos importar dotenv, si no está instalado, avisamos al usuario
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    print("ERROR: La librería 'python-dotenv' es necesaria. Instálala con: pip install python-dotenv")
+    sys.exit(1)
 
-class SASTOrchestrator:
-    """Orquestador SAST que integra con la configuración existente de TDH"""
+from github import Github
+import docker
 
-    def __init__(self, project_root: str = None, config_base_path: str = None):
-        """
-        Inicializa el orquestador SAST.
+# Importar pipeline SAST
+from core.sast_pipeline import SASTPipeline
 
-        Args:
-            project_root: Ruta raíz del proyecto a analizar
-            config_base_path: Ruta base para configuraciones (por defecto: directorio actual)
-        """
-        self.project_root = Path(project_root) if project_root else Path.cwd()
-        self.config_base_path = (
-            Path(config_base_path) if config_base_path else self.project_root
-        )
+# Cargar variables de entorno desde el archivo .env en la raíz
+load_dotenv()
 
-        # Cargar configuraciones
-        self.main_config = self._load_main_config()
-        self.sast_config = self._load_sast_tools_config()
+logger = logging.getLogger(__name__)
 
-        # Inicializar herramientas disponibles
-        self.available_tools = self._detect_available_tools()
-        self.results = []
-        self.stats = {
-            "total_files": 0,
-            "total_issues": 0,
-            "issues_by_severity": {},
-            "issues_by_tool": {},
-            "start_time": None,
-            "end_time": None,
-        }
+# ----------------------------------------------------------------------
+# Constantes y Configuración de Secretos
+# ----------------------------------------------------------------------
+COUNCIL_CONFIG_PATH = Path("config/llm_council.yaml")
+DEFAULT_BASE_IMAGE = "tdh-base:latest"
+GITHUB_TOKEN_KEY = "GITHUB_TOKEN"
+OPENROUTER_API_KEY = "OPENROUTER_API_KEY"
 
-    def _load_main_config(self) -> Dict[str, Any]:
-        """Carga la configuración principal de TDH"""
-        config_path = self.config_base_path / "config" / "tdh_config.yaml"
+# ----------------------------------------------------------------------
+# Modelo de Vulnerabilidad
+# ----------------------------------------------------------------------
+@dataclass
+class Vulnerability:
+    id: str
+    file: str
+    line: int
+    description: str
+    severity: str
+    rule_id: Optional[str] = None
+    additional_properties: Dict[str, Any] = field(default_factory=dict)
 
-        if not config_path.exists():
-            # Si no existe en la ruta base, buscar en el proyecto
-            config_path = self.project_root / "config" / "tdh_config.yaml"
-
-        if config_path.exists():
-            with open(config_path, "r") as f:
-                return yaml.safe_load(f)
-
-        # Configuración por defecto si no existe
-        return {
-            "sast": {
-                "tools": ["semgrep", "bandit", "cppcheck"],
-                "severity_filter": ["CRITICAL", "HIGH", "MEDIUM"],
-            }
-        }
-
-    def _load_sast_tools_config(self) -> Dict[str, Any]:
-        """Carga la configuración específica de herramientas SAST"""
-        # Primero intentar cargar desde la configuración principal
-        sast_config_file = self.main_config.get("sast", {}).get(
-            "config_file", "config/sast_tools.yaml"
-        )
-
-        config_paths = [
-            self.config_base_path / sast_config_file,
-            self.project_root / sast_config_file,
-            self.config_base_path / "config" / "sast_tools.yaml",
-            self.project_root / "config" / "sast_tools.yaml",
-            Path(__file__).parent.parent.parent / "config" / "sast_tools.yaml",
-        ]
-
-        for config_path in config_paths:
-            if config_path.exists():
-                print(f"📋 Cargando configuración SAST desde: {config_path}")
-                with open(config_path, "r") as f:
-                    return yaml.safe_load(f)
-
-        # Configuración por defecto si no existe
-        print("⚠️  No se encontró configuración SAST, usando valores por defecto")
-        return {
-            "global": {
-                "min_severity": "MEDIUM",
-                "timeout_per_tool": 60,
-                "parallel_execution": False,
-            },
-            "tools": {
-                "semgrep": {
-                    "enabled": True,
-                    "command": "semgrep",
-                    "args": {"base": ["--json", "--quiet", "--config", "auto"]},
-                    "file_extensions": [".py", ".js", ".ts", ".java", ".c", ".cpp"],
-                },
-                "bandit": {
-                    "enabled": True,
-                    "command": "bandit",
-                    "args": {"base": ["-f", "json"]},
-                    "file_extensions": [".py"],
-                },
-            },
-        }
-
-    def _detect_available_tools(self) -> Dict[str, Dict[str, Any]]:
-        """Detecta qué herramientas SAST están instaladas y disponibles"""
-        available_tools = {}
-        configured_tools = self.sast_config.get("tools", {})
-
-        for tool_name, tool_config in configured_tools.items():
-            if not tool_config.get("enabled", False):
-                continue
-
-            # Verificar si el comando existe
-            command = tool_config.get("command", tool_name)
-            is_available = self._check_tool_installed(command)
-
-            if is_available:
-                available_tools[tool_name] = {
-                    "config": tool_config,
-                    "command": command,
-                    "args": tool_config.get("args", {}).get("base", []),
-                    "available": True,
-                }
-                print(f"✅ Herramienta '{tool_name}' ({command}) está disponible")
-            else:
-                print(f"❌ Herramienta '{tool_name}' ({command}) NO está disponible")
-                # No la agregamos a available_tools
-
-        print(f"🔧 Herramientas realmente disponibles: {list(available_tools.keys())}")
-        return available_tools
-
-    def _check_tool_installed(self, command: str) -> bool:
-        """Verifica si una herramienta está instalada"""
+    @classmethod
+    def from_sast_result(cls, result_dict: Dict) -> Optional["Vulnerability"]:
+        """Extrae una vulnerabilidad del formato de SASTResult (legacy)."""
         try:
-            # Para version
-            result = subprocess.run(
-                [command, "--version"], capture_output=True, text=True, timeout=5
+            return cls(
+                id=result_dict.get("cwe", result_dict.get("id", "unknown")),
+                file=result_dict.get("file", ""),
+                line=result_dict.get("line", 0),
+                description=result_dict.get("message", ""),
+                severity=result_dict.get("severity", "unknown").upper(),
+                rule_id=result_dict.get("rule_id"),
+                additional_properties=result_dict
             )
-            return result.returncode == 0
-        except (
-            subprocess.CalledProcessError,
-            FileNotFoundError,
-            subprocess.TimeoutExpired,
-        ):
-            # Intentar con -v o help
-            for flag in ["-v", "-V", "--help", "--version"]:
-                try:
-                    subprocess.run([command, flag], capture_output=True, timeout=2)
-                    return True
-                except:
-                    continue
-            return False
-
-    def analyze_directory(self, directory_path: str = None) -> Dict[str, Any]:
-        """
-        Analiza un directorio completo con las herramientas SAST configuradas.
-
-        Args:
-            directory_path: Ruta al directorio a analizar (None = project_root)
-
-        Returns:
-            Diccionario con resultados del análisis
-        """
-        if directory_path is None:
-            directory_path = self.project_root
-        else:
-            directory_path = Path(directory_path)
-
-        if not directory_path.exists():
-            raise FileNotFoundError(f"Directorio no encontrado: {directory_path}")
-
-        print(f"🔍 Iniciando análisis SAST en: {directory_path}")
-        self.stats["start_time"] = datetime.now()
-
-        # Obtener lista de archivos a analizar
-        files_to_analyze = self._get_files_to_analyze(directory_path)
-        self.stats["total_files"] = len(files_to_analyze)
-
-        print(f"📄 Encontrados {len(files_to_analyze)} archivos para analizar")
-
-        # Analizar cada archivo
-        for file_path in files_to_analyze:
-            self.analyze_file(str(file_path))
-
-        self.stats["end_time"] = datetime.now()
-        self.stats["total_issues"] = len(self.results)
-
-        # Generar reporte
-        report_path = self.generate_report()
-
-        return {"stats": self.stats, "issues": self.results, "report_path": report_path}
-
-    def _get_files_to_analyze(self, directory_path: Path) -> List[Path]:
-        """Obtiene la lista de archivos a analizar según extensiones y exclusiones"""
-        all_files = []
-
-        # Obtener todas las extensiones de herramientas habilitadas y disponibles
-        extensions = set()
-        for tool_name, tool_info in self.available_tools.items():
-            if tool_info.get("available", False):
-                tool_extensions = tool_info["config"].get("file_extensions", [])
-                extensions.update(tool_extensions)
-
-        print(f"🔍 Buscando archivos con extensiones: {sorted(extensions)}")
-
-        # Para pruebas, limitar el número de archivos
-        max_files_total = 50  # Limitar para pruebas
-
-        for ext in extensions:
-            pattern = f"**/*{ext}"
-            try:
-                # Excluir explícitamente venv y otros directorios no deseados
-                files = []
-                for f in directory_path.glob(pattern):
-                    # EXCLUSIÓN MANUAL DE DIRECTORIOS NO DESEADOS
-                    excluded_dirs = [
-                        "venv",
-                        ".venv",
-                        "env",
-                        ".env",
-                        "__pycache__",
-                        "node_modules",
-                        ".git",
-                        "dist",
-                        "build",
-                        "target",
-                    ]
-                    if any(excluded_dir in str(f) for excluded_dir in excluded_dirs):
-                        continue
-                    files.append(f)
-
-                all_files.extend(files[:10])  # Máximo 10 archivos por extensión
-            except Exception as e:
-                print(f"   ⚠️  Error buscando archivos {ext}: {e}")
-
-        # Aplicar exclusiones configuradas
-        filtered_files = self._apply_exclusions(all_files, directory_path)
-
-        # Limitar el total para pruebas
-        if len(filtered_files) > max_files_total:
-            print(
-                f"📊 Limitando análisis a {max_files_total} archivos (de {len(filtered_files)})"
-            )
-            filtered_files = filtered_files[:max_files_total]
-
-        return filtered_files
-
-    def _apply_exclusions(self, files: List[Path], base_dir: Path) -> List[Path]:
-        """Aplica patrones de exclusión a la lista de archivos"""
-        exclusions = self.sast_config.get("exclusions", {})
-        global_exclusions = exclusions.get("global", {})
-
-        filtered_files = []
-
-        for file_path in files:
-            rel_path = file_path.relative_to(base_dir)
-            exclude = False
-
-            # Verificar exclusiones de directorios
-            excluded_dirs = global_exclusions.get("directories", [])
-            for pattern in excluded_dirs:
-                if rel_path.match(pattern):
-                    exclude = True
-                    break
-
-            # Verificar exclusiones de archivos
-            if not exclude:
-                excluded_files = global_exclusions.get("files", [])
-                for pattern in excluded_files:
-                    if rel_path.match(pattern):
-                        exclude = True
-                        break
-
-            if not exclude:
-                filtered_files.append(file_path)
-
-        return filtered_files
-
-    def analyze_file(self, filepath: str) -> List[Dict[str, Any]]:
-        """Analiza un archivo individual con herramientas SAST"""
-        file_path = Path(filepath)
-        if not file_path.exists():
-            print(f"❌ Archivo no encontrado: {filepath}")
-            return []
-
-        file_ext = file_path.suffix.lower()
-        file_issues = []
-
-        # Determinar qué herramientas usar para esta extensión
-        tools_for_file = self._get_tools_for_extension(file_ext)
-
-        for tool_name in tools_for_file:
-            if (
-                tool_name in self.available_tools
-                and self.available_tools[tool_name]["available"]
-            ):
-                print(f"  🛠️  Ejecutando {tool_name} en {file_path.name}...")
-                try:
-                    issues = self._run_tool(tool_name, str(file_path))
-                    file_issues.extend(issues)
-                except Exception as e:
-                    print(f"    ❌ Error con {tool_name}: {e}")
-
-        # Actualizar estadísticas
-        for issue in file_issues:
-            self._update_stats(issue)
-
-        self.results.extend(file_issues)
-        return file_issues
-
-    def _get_tools_for_extension(self, extension: str) -> List[str]:
-        """Devuelve herramientas recomendadas para una extensión específica"""
-        # Primero buscar en toolchains por lenguaje
-        language_toolchains = self.sast_config.get("language_toolchains", {})
-
-        # Mapeo de extensiones a lenguaje
-        extension_to_lang = {
-            ".py": "python",
-            ".c": "c_cpp",
-            ".cpp": "c_cpp",
-            ".h": "c_cpp",
-            ".hpp": "c_cpp",
-            ".java": "java",
-            ".js": "javascript",
-            ".ts": "javascript",
-            ".jsx": "javascript",
-            ".tsx": "javascript",
-        }
-
-        lang = extension_to_lang.get(extension)
-        if lang and lang in language_toolchains:
-            toolchain = language_toolchains[lang]
-            return toolchain.get("primary", []) + toolchain.get("secondary", [])
-
-        # Fallback: herramientas que soportan esta extensión
-        tools_for_ext = []
-        for tool_name, tool_info in self.available_tools.items():
-            if tool_info["available"]:
-                tool_extensions = tool_info["config"].get("file_extensions", [])
-                if extension in tool_extensions:
-                    tools_for_ext.append(tool_name)
-
-        return tools_for_ext
-
-    def _run_tool(self, tool_name: str, filepath: str) -> List[Dict[str, Any]]:
-        """Ejecuta una herramienta específica en un archivo"""
-        tool_info = self.available_tools[tool_name]
-        command = tool_info["command"]
-        args = tool_info["args"]
-
-        try:
-            timeout = self.sast_config.get("global", {}).get("timeout_per_tool", 60)
-
-            if tool_name == "cppcheck":
-                # Configuración específica para cppcheck
-                cmd = [command, "--enable=all", "--xml", "--xml-version=2", filepath]
-
-                try:
-                    result = subprocess.run(
-                        cmd, capture_output=True, text=True, timeout=timeout
-                    )
-
-                    # cppcheck escribe XML en stderr, no stdout
-                    output = result.stderr if result.stderr else result.stdout
-        
-                    # DEBUG: Mostrar qué estamos parseando
-                    if output:
-                        print(f"    📄 Parseando cppcheck (primeras 500 chars): {output[:500]}")
-        
-                    return self._parse_cppcheck_output(output, filepath)
-
-                except subprocess.TimeoutExpired:
-                    print(f"    ⏰ cppcheck excedió el tiempo límite")
-                    return []
-                except Exception as e:
-                    print(f"    ❌ Error ejecutando cppcheck: {e}")
-                    return []
-            else:
-                # Para otras herramientas
-                full_args = args + [filepath]
-                result = subprocess.run(
-                    [command] + full_args,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout,
-                )
-
-                # Parsear salida según la herramienta
-                if tool_name == "semgrep":
-                    return self._parse_semgrep_output(result.stdout, filepath)
-                elif tool_name == "bandit":
-                    return self._parse_bandit_output(result.stdout, filepath)
-                else:
-                    # Parseo genérico
-                    return self._parse_generic_output(
-                        tool_name, result.stdout, filepath
-                    )
-
-        except subprocess.TimeoutExpired:
-            print(f"    ⏰ {tool_name} excedió el tiempo límite")
-            return []
         except Exception as e:
-            print(f"    ❌ Error ejecutando {tool_name}: {e}")
-            return []
+            logger.warning(f"No se pudo extraer vulnerabilidad: {e}")
+            return None
 
-    def _parse_semgrep_output(self, output: str, filepath: str) -> List[Dict[str, Any]]:
-        """Parsea la salida de semgrep"""
-        issues = []
+# ----------------------------------------------------------------------
+# Máquina de Estados
+# ----------------------------------------------------------------------
+class TaskState(Enum):
+    PENDING = "pending"
+    WORKTREE_CREATED = "worktree_created"
+    CONTAINER_STARTED = "container_started"
+    TEST_DESIGNING = "test_designing"
+    FIX_DESIGNING = "fix_designing"
+    DOCUMENTING = "documenting"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    PR_CREATED = "pr_created"
 
-        try:
-            data = json.loads(output)
-            for finding in data.get("results", []):
-                severity = finding.get("extra", {}).get("severity", "MEDIUM").upper()
+    @classmethod
+    def from_log(cls, log_line: str) -> Optional["TaskState"]:
+        match = re.search(r'\[STATE:(\w+)\]', log_line)
+        if match:
+            state_str = match.group(1).lower()
+            for state in cls:
+                if state.value == state_str:
+                    return state
+        return None
 
-                # Filtrar por severidad mínima
-                min_severity = self.sast_config.get("global", {}).get(
-                    "min_severity", "MEDIUM"
-                )
-                severity_order = {
-                    "CRITICAL": 0,
-                    "HIGH": 1,
-                    "MEDIUM": 2,
-                    "LOW": 3,
-                    "INFO": 4,
-                }
+# ----------------------------------------------------------------------
+# Modelo de Tarea
+# ----------------------------------------------------------------------
+@dataclass
+class SOTATask:
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    vulnerability: Vulnerability = None
+    model_key: str = ""
+    model_display: str = ""
+    worktree_path: Path = None
+    container_name: str = ""
+    state: TaskState = TaskState.PENDING
+    result: Dict[str, Any] = field(default_factory=dict)
+    pr_url: Optional[str] = None
+    error: Optional[str] = None
+    created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
 
-                if severity_order.get(severity, 99) > severity_order.get(
-                    min_severity, 99
-                ):
-                    continue
+    def update_state(self, new_state: TaskState):
+        self.state = new_state
+        self.updated_at = datetime.now()
+        logger.info(f"[TASK:{self.task_id}] Estado → {new_state.value}")
 
-                issues.append(
-                    {
-                        "tool": "semgrep",
-                        "rule_id": finding.get("check_id", ""),
-                        "severity": severity,
-                        "message": finding.get("extra", {}).get("message", ""),
-                        "file": filepath,
-                        "line": finding.get("start", {}).get("line", 0),
-                        "end_line": finding.get("end", {}).get("line", 0),
-                        "confidence": finding.get("extra", {}).get(
-                            "confidence", "MEDIUM"
-                        ),
-                        "category": finding.get("extra", {})
-                        .get("metadata", {})
-                        .get("category", ""),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-        except json.JSONDecodeError as e:
-            print(f"    ❌ Error parseando JSON de semgrep: {e}")
+# ----------------------------------------------------------------------
+# Orquestador Principal
+# ----------------------------------------------------------------------
+class SASTOrchestrator:
+    def __init__(self, council_path: Path = COUNCIL_CONFIG_PATH):
+        self.results_dir = Path("results")
+        self.results_dir.mkdir(exist_ok=True)
 
-        return issues
+        # Cargar configuración del consejo
+        self.council_config = self._load_council_config(council_path)
+        self.llm_configs = self.council_config.get("llm_configs", {})
+        self.orchestrator_config = self.council_config.get("orchestrator", {})
 
-    def _parse_bandit_output(self, output: str, filepath: str) -> List[Dict[str, Any]]:
-        """Parsea la salida de bandit"""
-        issues = []
+        # Secretos
+        self.github_token = os.getenv(GITHUB_TOKEN_KEY)
+        self.openrouter_key = os.getenv(OPENROUTER_API_KEY)
 
-        try:
-            data = json.loads(output)
-            for issue in data.get("results", []):
-                severity = issue.get("issue_severity", "MEDIUM").upper()
+        self._validate_secrets()
 
-                issues.append(
-                    {
-                        "tool": "bandit",
-                        "rule_id": issue.get("test_id", ""),
-                        "severity": severity,
-                        "message": issue.get("issue_text", ""),
-                        "file": filepath,
-                        "line": issue.get("line_number", 0),
-                        "confidence": issue.get("issue_confidence", "MEDIUM"),
-                        "more_info": issue.get("more_info", ""),
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-        except json.JSONDecodeError as e:
-            print(f"    ❌ Error parseando JSON de bandit: {e}")
+        self.tasks: Dict[str, SOTATask] = {}
+        self.active_containers: Set[str] = set()
+        self.docker_client = docker.from_env()
 
-        return issues
-
-    def _parse_cppcheck_output(self, output: str, filepath: str) -> List[Dict[str, Any]]:
-        """Parsea la salida de cppcheck (XML o texto)"""
-        issues = []
-        
-        if not output.strip():
-            return issues
-        
-        # Obtener configuración para mapeo de severidades
-        cppcheck_config = self.sast_config.get('tools', {}).get('cppcheck', {})
-        severity_mapping = cppcheck_config.get('severity_mapping', {})
-        
-        # Intentar parsear como XML
-        if '<?xml' in output:
-            try:
-                import xml.etree.ElementTree as ET
-                from xml.parsers.expat import ExpatError
-                
-                # Intentar parsear
-                try:
-                    root = ET.fromstring(output)
-                except ExpatError:
-                    # Intentar limpiar líneas problemáticas
-                    lines = output.split('\n')
-                    clean_lines = [l for l in lines if not l.strip().startswith('Checking')]
-                    clean_output = '\n'.join(clean_lines)
-                    root = ET.fromstring(clean_output)
-                
-                # Procesar errores
-                for error in root.findall('.//error'):
-                    severity = error.get('severity', 'information').lower()
-                    error_id = error.get('id', '')
-                    
-                    # MAPEAR SEVERIDAD CORRECTAMENTE
-                    mapped_severity = severity_mapping.get(severity, 'INFO')
-                    
-                    # Obtener línea y columna
-                    line = error.get('line', '0')
-                    column = error.get('column', '0')
-                    
-                    issue = {
-                        'tool': 'cppcheck',
-                        'rule_id': error_id,
-                        'severity': mapped_severity,
-                        'message': error.get('msg', ''),
-                        'file': filepath,
-                        'line': int(line) if line.isdigit() else 0,
-                        'column': int(column) if column.isdigit() else 0,
-                        'timestamp': datetime.now().isoformat()
-                    }
-                    
-                    # APLICAR FILTRO
-                    if self._should_include_issue(issue, 'cppcheck'):
-                        issues.append(issue)
-                
-                return issues
-                
-            except Exception as e:
-                print(f"    ⚠️  Error parseando XML de cppcheck: {e}")
-                # Continuar con parsing de texto
-
-        # Parsear como texto (formato por defecto)
-        for line in output.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-
-            # Formato típico de cppcheck: [archivo:linea] (severidad) mensaje
-            if line.startswith("[") and "]" in line:
-                parts = line.split("]", 1)
-                location = parts[0][1:]  # Quitar el '['
-                rest = parts[1].strip() if len(parts) > 1 else ""
-
-                # Extraer archivo y línea
-                if ":" in location:
-                    file_part, line_part = location.split(":", 1)
-                    try:
-                        line_num = int(line_part.strip())
-                    except ValueError:
-                        line_num = 0
-                else:
-                    line_num = 0
-
-                # Extraer severidad y mensaje
-                severity = "MEDIUM"
-                if "(error)" in rest:
-                    severity = "ERROR"
-                    rest = rest.replace("(error)", "").strip()
-                elif "(warning)" in rest:
-                    severity = "WARNING"
-                    rest = rest.replace("(warning)", "").strip()
-                elif "(style)" in rest:
-                    severity = "STYLE"
-                    rest = rest.replace("(style)", "").strip()
-                elif "(performance)" in rest:
-                    severity = "PERFORMANCE"
-                    rest = rest.replace("(performance)", "").strip()
-
-                # Mapear a severidades estándar
-                severity_map = {
-                    "ERROR": "CRITICAL",
-                    "WARNING": "HIGH",
-                    "STYLE": "MEDIUM",
-                    "PERFORMANCE": "LOW",
-                }
-
-                issues.append(
-                    {
-                        "tool": "cppcheck",
-                        "severity": severity_map.get(severity, "MEDIUM"),
-                        "message": rest,
-                        "file": filepath,
-                        "line": line_num,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
-
-        return issues
-
-    def _parse_generic_output(
-        self, tool_name: str, output: str, filepath: str
-    ) -> List[Dict[str, Any]]:
-        """Parsea salida genérica de herramientas"""
-        issues = []
-
-        # Intentar parsear como JSON
-        try:
-            data = json.loads(output)
-            if isinstance(data, list):
-                for item in data:
-                    issues.append(
-                        {
-                            "tool": tool_name,
-                            "severity": "MEDIUM",
-                            "message": str(item),
-                            "file": filepath,
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    )
-        except:
-            # Si no es JSON, tratar como texto
-            for line in output.split("\n"):
-                if line.strip():
-                    issues.append(
-                        {
-                            "tool": tool_name,
-                            "severity": "INFO",
-                            "message": line.strip(),
-                            "file": filepath,
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                    )
-
-        return issues
-
-    def _update_stats(self, issue: Dict[str, Any]):
-        """Actualiza estadísticas con un nuevo issue"""
-        severity = issue.get("severity", "UNKNOWN")
-        tool = issue.get("tool", "UNKNOWN")
-
-        # Contar por severidad
-        self.stats["issues_by_severity"][severity] = (
-            self.stats["issues_by_severity"].get(severity, 0) + 1
-        )
-
-        # Contar por herramienta
-        self.stats["issues_by_tool"][tool] = (
-            self.stats["issues_by_tool"].get(tool, 0) + 1
-        )
-
-    def generate_report(self, output_format: str = None, output_dir: str = None) -> str:
-        """Genera un reporte con los resultados del análisis"""
-        if output_format is None:
-            output_format = self.sast_config.get("reporting", {}).get(
-                "default_format", "json"
-            )
-
-        if output_dir is None:
-            output_dir = self.sast_config.get("reporting", {}).get(
-                "output_dir", "reports/sast"
-            )
-
-        output_path = Path(output_dir)
-        output_path.mkdir(parents=True, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-        if output_format == "json":
-            return self._generate_json_report(output_path, timestamp)
-        elif output_format == "console":
-            self._generate_console_report()
-            return "console"
+    def _validate_secrets(self):
+        missing = []
+        if not self.github_token:
+            missing.append(GITHUB_TOKEN_KEY)
+        if not self.openrouter_key:
+            missing.append(OPENROUTER_API_KEY)
+        if missing:
+            logger.error(f"❌ Faltan secretos en .env: {', '.join(missing)}")
         else:
-            print(f"⚠️  Formato de reporte no soportado: {output_format}, usando JSON")
-            return self._generate_json_report(output_path, timestamp)
+            logger.info("🔐 Secretos cargados correctamente")
 
-    def _generate_json_report(self, output_dir: Path, timestamp: str) -> str:
-        """Genera un reporte en formato JSON"""
-        report_data = {
-            "metadata": {
-                "project": str(self.project_root),
-                "scan_id": timestamp,
-                "start_time": (
-                    self.stats["start_time"].isoformat()
-                    if self.stats["start_time"]
-                    else None
-                ),
-                "end_time": (
-                    self.stats["end_time"].isoformat()
-                    if self.stats["end_time"]
-                    else None
-                ),
-                "duration_seconds": (
-                    (self.stats["end_time"] - self.stats["start_time"]).total_seconds()
-                    if self.stats["start_time"] and self.stats["end_time"]
-                    else None
-                ),
-                "tdh_version": self.main_config.get("engine", {}).get(
-                    "version", "0.1.0"
-                ),
+    def _load_council_config(self, path: Path) -> Dict:
+        if not path.exists():
+            logger.warning(f"Archivo {path} no encontrado. Usando valores por defecto.")
+            return {}
+        try:
+            with open(path, 'r') as f:
+                return yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.error(f"Error cargando {path}: {e}")
+            return {}
+
+    def _get_authenticated_repo_url(self, repo_url: str) -> str:
+        """
+        Si hay token de GitHub, lo inyecta en la URL para autenticación.
+        Retorna la URL original si no hay token o la URL ya contiene credenciales.
+        """
+        if not self.github_token:
+            return repo_url
+        # Solo modificar URLs https
+        if repo_url.startswith("https://"):
+            # Insertar token antes del @ o al principio
+            if "@" in repo_url:
+                # Ya tiene credenciales, no sobrescribir
+                return repo_url
+            # Insertar token
+            return repo_url.replace("https://", f"https://{self.github_token}@")
+        return repo_url
+
+    async def _run_sast(self, repo_url: str) -> List[Vulnerability]:
+        """
+        Ejecuta análisis SAST sobre el repositorio y retorna lista de vulnerabilidades
+        en el formato esperado por el orquestador (objetos Vulnerability de este módulo).
+        """
+        logger.info(f"🔍 Ejecutando análisis SAST en {repo_url}")
+        
+        # Usar URL autenticada para clonar (si el repo es privado)
+        auth_url = self._get_authenticated_repo_url(repo_url)
+        
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            logger.info(f"📦 Clonando repositorio a {tmp_dir}")
+            try:
+                subprocess.run(
+                    ["git", "clone", "--depth", "1", auth_url, tmp_dir],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Error clonando repositorio: {e.stderr}")
+                return []
+            
+            # Ejecutar pipeline SAST
+            sast_pipeline = SASTPipeline()
+            sast_result = await sast_pipeline.run_complete_analysis(tmp_dir)
+            
+            # Convertir resultados al formato de Vulnerability del orquestador
+            vulnerabilities = []
+            for vuln in sast_result.vulnerabilities:
+                if vuln.false_positive:
+                    continue
+                # Crear objeto Vulnerability (definido en este módulo)
+                orch_vuln = Vulnerability(
+                    id=vuln.vulnerability_id,
+                    file=vuln.file_path,
+                    line=vuln.line_number,
+                    description=vuln.message,
+                    severity=vuln.severity.upper(),
+                    rule_id=vuln.cwe_id,
+                    additional_properties={
+                        "tool": vuln.tool,
+                        "confidence": vuln.confidence,
+                        "owasp": vuln.owasp_category
+                    }
+                )
+                vulnerabilities.append(orch_vuln)
+            
+            logger.info(f"✅ SAST completado. {len(vulnerabilities)} vulnerabilidades encontradas.")
+            return vulnerabilities
+
+    async def orchestrate(self, repo_url: str, council_filter: Optional[List[str]] = None, dry_run: bool = False):
+        """
+        Punto de entrada principal.
+        - Ejecuta SAST
+        - Filtra vulnerabilidades HIGH/CRITICAL
+        - Asigna modelos según el consejo
+        - Crea worktrees y lanza contenedores
+        - Espera resultados y genera PRs
+        """
+        logger.info("🚀 Iniciando orquestación SAST multi‑SOTA")
+
+        # 1. Ejecutar SAST y obtener vulnerabilidades
+        logger.info(f"🔍 Ejecutando análisis SAST en {repo_url}")
+        vulnerabilities = await self._run_sast(repo_url)
+
+        if not vulnerabilities:
+            logger.warning("No se encontraron vulnerabilidades")
+            return self._empty_result()
+
+        # 2. Filtrar por severidad HIGH/CRITICAL
+        severities_to_process = {"high", "critical"}
+        filtered_vulns = [
+            v for v in vulnerabilities
+            if v.severity.lower() in severities_to_process
+        ]
+
+        logger.info(f"Vulnerabilidades totales: {len(vulnerabilities)}")
+        logger.info(f"Vulnerabilidades HIGH/CRITICAL: {len(filtered_vulns)}")
+
+        if not filtered_vulns:
+            logger.info("No hay vulnerabilidades HIGH/CRITICAL que procesar")
+            return self._empty_result()
+
+        # (Opcional) Limitar a un máximo para pruebas
+        MAX_VULNS = 2  # Ajusta según necesidad
+        if len(filtered_vulns) > MAX_VULNS:
+            logger.warning(f"Demasiadas vulnerabilidades, procesando solo las primeras {MAX_VULNS}")
+            filtered_vulns = filtered_vulns[:MAX_VULNS]
+
+        # 3. Asignar modelos (round‑robin sobre los modelos configurados)
+        model_keys = list(self.llm_configs.keys())
+        if council_filter:
+            # Si se pasa un filtro, usar solo esos modelos (si existen)
+            model_keys = [m for m in model_keys if m in council_filter]
+
+        if not model_keys:
+            logger.error("No hay modelos configurados para usar")
+            return self._empty_result()
+
+        tasks = []
+        for i, vuln in enumerate(filtered_vulns):
+            model_key = model_keys[i % len(model_keys)]
+            model_display = self.llm_configs[model_key].get("model", model_key)
+            task = SOTATask(
+                vulnerability=vuln,
+                model_key=model_key,
+                model_display=model_display
+            )
+            self.tasks[task.task_id] = task
+            tasks.append(task)
+
+        # 4. Crear worktrees (con nombre único)
+        for task in tasks:
+            try:
+                # Crear un identificador único para el worktree
+                vuln_id_safe = re.sub(r'[^\w\-]', '_', task.vulnerability.id)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")  # incluye microsegundos
+                branch_name = f"tdh-fix/{vuln_id_safe}-{timestamp}"
+
+                worktree_path = await self._create_worktree(
+                    repo_url,
+                    self.orchestrator_config.get("base_branch", "main"),
+                    branch_name  # pasamos el nombre completo
+                )
+                task.worktree_path = worktree_path
+                task.update_state(TaskState.WORKTREE_CREATED)
+            except Exception as e:
+                task.update_state(TaskState.FAILED)
+                task.error = f"Error creando worktree: {e}"
+
+        # 5. Ejecutar tareas en paralelo con límite de concurrencia para evitar rate limiting
+        semaphore = asyncio.Semaphore(1)  # solo una tarea a la vez
+
+        async def run_with_semaphore(task):
+            async with semaphore:
+                await self._run_single_task(task, dry_run)
+
+        agent_tasks = []
+        for task in tasks:
+            if task.state != TaskState.FAILED:
+                agent_tasks.append(run_with_semaphore(task))
+
+        if agent_tasks:
+            await asyncio.gather(*agent_tasks, return_exceptions=True)
+
+        # 6. Procesar resultados y crear PRs
+        pr_tasks = []
+        for task in tasks:
+            if task.state == TaskState.COMPLETED:
+                fix_info = self._parse_agent_output(task)
+                task.result.update(fix_info)
+                pr_tasks.append(self._create_pull_request(task, repo_url, dry_run))
+            elif task.state == TaskState.FAILED:
+                logger.error(f"Tarea {task.task_id} falló: {task.error}")
+
+        if pr_tasks:
+            await asyncio.gather(*pr_tasks, return_exceptions=True)
+
+        # 7. Generar reporte
+        return self._generate_report()
+
+    async def _create_worktree(self, repo_url: str, base_branch: str, branch_name: str) -> Path:
+        """
+        Crea un worktree con el nombre de rama dado.
+        Retorna la ruta absoluta al worktree.
+        """
+        worktrees_base = Path("/tmp/tdh-worktrees")
+        worktrees_base.mkdir(exist_ok=True, parents=True)
+
+        worktree_path = worktrees_base / branch_name
+
+        # Clonar el repositorio en un directorio temporal si no existe
+        repo_dir = worktrees_base / "repo"
+        if not repo_dir.exists():
+            logger.info(f"Clonando {repo_url} en {repo_dir}")
+            auth_url = self._get_authenticated_repo_url(repo_url)
+            subprocess.run(
+                ["git", "clone", auth_url, str(repo_dir)],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            # Configurar remote con token para futuros pushes (si ya lo tiene, no hace falta)
+            # Aseguramos que el remote tenga la URL autenticada
+            if self.github_token:
+                subprocess.run(
+                    ["git", "-C", str(repo_dir), "remote", "set-url", "origin", auth_url],
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+
+        # Crear el worktree
+        logger.info(f"Creando worktree {branch_name} en {worktree_path}")
+        subprocess.run(
+            ["git", "-C", str(repo_dir), "worktree", "add", "-b", branch_name, str(worktree_path)],
+            check=True,
+            capture_output=True,
+            text=True
+        )
+
+        return worktree_path
+
+    def _generate_task_input(self, task: SOTATask) -> Dict:
+        return {
+            "model": task.model_key,  # antes era task.model_display
+            "vulnerability": {
+                "id": task.vulnerability.id,
+                "file": task.vulnerability.file,
+                "line": task.vulnerability.line,
+                "description": task.vulnerability.description,
+                "severity": task.vulnerability.severity
             },
-            "statistics": self.stats,
-            "issues": self.results,
-            "configuration": {
-                "tools_used": [
-                    name
-                    for name, info in self.available_tools.items()
-                    if info["available"]
-                ],
-                "sast_config": self.sast_config.get("global", {}),
-            },
+            "repo_path": str(task.worktree_path),
+            "openrouter_api_key": self.openrouter_key
         }
 
-        report_path = output_dir / f"sast_report_{timestamp}.json"
-        with open(report_path, "w", encoding="utf-8") as f:
-            json.dump(report_data, f, indent=2, default=str)
+    async def _run_single_task(self, task: SOTATask, dry_run: bool = False):
+        """
+        Ejecuta un agente SOTA en un contenedor Docker para una vulnerabilidad específica.
+        Crea un archivo input.json en el worktree y ejecuta el agente con redirección de stdin.
+        """
+        if not self.openrouter_key:
+            task.error = f"Falta {OPENROUTER_API_KEY}. Tarea abortada."
+            task.update_state(TaskState.FAILED)
+            return
 
-        print(f"📊 Reporte JSON generado: {report_path}")
-        return str(report_path)
+        if dry_run:
+            logger.info(f"[DRY RUN] Simulando ejecución para tarea {task.task_id}")
+            task.result = {"fix": "simulated", "test": "simulated"}
+            task.update_state(TaskState.COMPLETED)
+            return
 
-    def _generate_console_report(self):
-        """Muestra un resumen del análisis en consola"""
-        print("\n" + "=" * 60)
-        print("SAST ANALYSIS REPORT")
-        print("=" * 60)
+        # Preparar el input JSON para el agente
+        input_json = self._generate_task_input(task)
+        container_name = f"tdh-agent-{task.task_id}"
+        task.container_name = container_name
 
-        # Información básica
-        if self.stats["start_time"] and self.stats["end_time"]:
-            duration = (
-                self.stats["end_time"] - self.stats["start_time"]
-            ).total_seconds()
-            print(f"⏱️  Duración: {duration:.2f} segundos")
-
-        print(f"📄 Archivos analizados: {self.stats['total_files']}")
-        print(f"⚠️  Issues encontrados: {self.stats['total_issues']}")
-
-        # Issues por severidad
-        if self.stats["issues_by_severity"]:
-            print("\n📊 Issues por severidad:")
-            for severity, count in sorted(self.stats["issues_by_severity"].items()):
-                print(f"  {severity}: {count}")
-
-        # Issues por herramienta
-        if self.stats["issues_by_tool"]:
-            print("\n🛠️  Issues por herramienta:")
-            for tool, count in sorted(self.stats["issues_by_tool"].items()):
-                print(f"  {tool}: {count}")
-
-        # Issues críticos/altos
-        critical_issues = [
-            issue
-            for issue in self.results
-            if issue.get("severity") in ["CRITICAL", "HIGH"]
-        ]
-
-        if critical_issues:
-            print(f"\n⛔ Issues CRÍTICOS/ALTOS encontrados ({len(critical_issues)}):")
-            for i, issue in enumerate(critical_issues[:10], 1):
-                print(f"  {i}. [{issue.get('tool')}] {issue.get('message', '')}")
-                print(f"     📍 {issue.get('file')}:{issue.get('line', 0)}")
-
-            if len(critical_issues) > 10:
-                print(f"     ... y {len(critical_issues) - 10} más")
-
-        print("=" * 60)
-
-    def _should_exclude_file(self, file_path: Path) -> bool:
-        """Determina si un archivo debe ser excluido del análisis"""
-        
-        exclusion_patterns = [
-            # Directorios
-            "**/venv/**",
-            "**/.venv/**",
-            "**/env/**",
-            "**/.env/**",
-            "**/__pycache__/**",
-            "**/node_modules/**",
-            "**/.git/**",
-            "**/dist/**",
-            "**/build/**",
-            "**/target/**",
-            "**/.idea/**",
-            "**/.vscode/**",
+        # Crear archivo input.json en el worktree (accesible desde el contenedor)
+        input_file = task.worktree_path / "input.json"
+        try:
+            with open(input_file, 'w') as f:
+                json.dump(input_json, f, indent=2)
+            logger.info(f"📄 Archivo de input creado en {input_file}")
             
-            # Archivos específicos
-            "**/*.min.js",
-            "**/*.min.css",
-            "**/*.bundle.js",
-            "**/*.log",
-            "**/package-lock.json",
-            "**/yarn.lock",
-        ]
-        
-        for pattern in exclusion_patterns:
-            if file_path.match(pattern):
-                return True
-        
-        return False
+            # Verificar que el archivo existe
+            if input_file.exists():
+                logger.info(f"✅ El archivo existe, tamaño: {input_file.stat().st_size} bytes")
+            else:
+                logger.error(f"❌ El archivo no existe después de escribirlo")
+                task.error = "No se pudo crear input.json (desapareció)"
+                task.update_state(TaskState.FAILED)
+                return
+        except Exception as e:
+            logger.error(f"Error creando input.json: {e}")
+            task.error = f"No se pudo crear input.json: {e}"
+            task.update_state(TaskState.FAILED)
+            return
 
-    def _should_include_issue(self, issue: Dict[str, Any], tool_name: str) -> bool:
-        """Determina si un issue debe ser incluido basado en severidad y filtros"""
-        
-        # Obtener severidad mínima configurada
-        min_severity = self.sast_config.get('global', {}).get('min_severity', 'MEDIUM')
-        
-        # Orden de severidad (de mayor a menor)
-        severity_order = {
-            'CRITICAL': 0,
-            'HIGH': 1,
-            'MEDIUM': 2,
-            'LOW': 3,
-            'INFO': 4,
-            'UNKNOWN': 5
+        try:
+            # Iniciar contenedor en segundo plano con sleep infinity para mantenerlo vivo
+            container = self.docker_client.containers.run(
+                image=DEFAULT_BASE_IMAGE,
+                command=["sleep", "infinity"],
+                name=container_name,
+                detach=True,
+                remove=False,
+                volumes={
+                    str(task.worktree_path): {"bind": "/workspace", "mode": "rw"},
+                    # Montar el archivo de configuración del consejo
+                    str(COUNCIL_CONFIG_PATH.absolute()): {"bind": "/etc/tdh/llm_council.yaml", "mode": "ro"}
+                },
+                working_dir="/workspace",
+                environment={
+                    "OPENROUTER_API_KEY": self.openrouter_key,
+                    "TDH_COUNCIL_CONFIG": "/etc/tdh/llm_council.yaml"
+                }
+            )
+            self.active_containers.add(container_name)
+            task.update_state(TaskState.CONTAINER_STARTED)
+
+            # Verificar que el archivo sigue existiendo antes de ejecutar
+            if not input_file.exists():
+                logger.error(f"❌ El archivo input.json desapareció antes de ejecutar el agente")
+                task.error = "input.json desapareció"
+                task.update_state(TaskState.FAILED)
+                return
+
+            # Ejecutar el agente dentro del contenedor, redirigiendo stdin desde el archivo
+            exec_result = container.exec_run(
+                "bash -c 'python /usr/local/bin/sota_agent.py < /workspace/input.json'"
+            )
+            output = exec_result.output.decode()
+            exit_code = exec_result.exit_code
+
+            # Obtener logs completos del contenedor
+            logs = container.logs(stdout=True, stderr=True).decode()
+            task.result["logs"] = logs
+            task.result["output"] = output
+            task.result["exit_code"] = exit_code
+
+            # Mostrar logs para depuración
+            logger.error(f"🔍 DEBUG - Salida del agente (primeros 500 chars): {output[:500]}")
+            logger.error(f"🔍 DEBUG - Logs del contenedor (primeros 500 chars): {logs[:500]}")
+
+            # Parsear la salida del agente (se espera JSON)
+            json_output = self._extract_json_from_output(output)
+            if json_output:
+                task.result.update(json_output)
+            else:
+                # Si no hay JSON, al menos guardamos la salida como texto
+                task.result["raw_output"] = output
+
+            if exit_code == 0:
+                task.update_state(TaskState.COMPLETED)
+            else:
+                task.update_state(TaskState.FAILED)
+                task.error = f"Agente falló con código {exit_code}"
+
+        except Exception as e:
+            task.update_state(TaskState.FAILED)
+            task.error = str(e)
+            logger.exception(f"Error en contenedor para tarea {task.task_id}")
+        finally:
+            # Limpiar: eliminar contenedor
+            if container_name in self.active_containers:
+                self.active_containers.remove(container_name)
+            try:
+                container = self.docker_client.containers.get(container_name)
+                container.remove(force=True)
+            except:
+                pass
+            # No eliminar input.json para depuración (comentado)
+            # try:
+            #     input_file.unlink()
+            # except:
+            #     pass
+
+    def _extract_json_from_output(self, output: str) -> Optional[Dict]:
+        """
+        Extrae el primer bloque JSON válido de la salida.
+        Busca desde el final hacia el principio para encontrar el último JSON.
+        """
+        import re
+        # Patrón para encontrar objetos JSON (no perfecto pero funciona)
+        pattern = r'(\{.*\})'
+        matches = re.findall(pattern, output, re.DOTALL)
+        for match in reversed(matches):
+            try:
+                return json.loads(match)
+            except:
+                continue
+        return None
+
+    def _parse_agent_output(self, task: SOTATask) -> Dict:
+        output = task.result.get("output", "")
+        try:
+            match = re.search(r'({.*})', output, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+        except:
+            pass
+        return {}
+
+    async def _create_pull_request(self, task: SOTATask, repo_url: str, dry_run: bool = False):
+        if dry_run:
+            logger.info(f"[DRY RUN] Se crearía PR para {task.task_id}")
+            task.pr_url = "https://github.com/dry-run/pr"
+            task.update_state(TaskState.PR_CREATED)
+            return
+
+        if not self.github_token:
+            task.error = "No hay token de GitHub, no se puede crear PR"
+            return
+
+        try:
+            repo = self._get_github_repo(repo_url)
+            branch_name = task.worktree_path.name
+
+            # Configurar identidad de git
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "config", "user.email", "tdh-bot@example.com"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "config", "user.name", "TDH Bot"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+
+            # Hacer commit de los cambios
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "add", "."],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "commit", "-m", f"Fix {task.vulnerability.id}"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+
+            # Hacer push
+            subprocess.run(
+                ["git", "-C", str(task.worktree_path), "push", "-u", "origin", branch_name],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+
+            pr_title = f"Fix: {task.vulnerability.id} - {task.vulnerability.description[:50]}"
+            pr_body = f"Este PR soluciona la vulnerabilidad **{task.vulnerability.id}**.\n\n"
+            pr_body += f"**Archivo:** {task.vulnerability.file}:{task.vulnerability.line}\n"
+            pr_body += f"**Descripción:** {task.vulnerability.description}\n\n"
+            pr_body += "**Cambios realizados por el agente autónomo.**"
+
+            pr = repo.create_pull(
+                title=pr_title,
+                body=pr_body,
+                head=branch_name,
+                base=self.orchestrator_config.get("base_branch", "main")
+            )
+            task.pr_url = pr.html_url
+            task.update_state(TaskState.PR_CREATED)
+            logger.info(f"✅ Pull request creado: {pr.html_url}")
+
+        except subprocess.CalledProcessError as e:
+            task.error = f"Error en git: {e.stderr}"
+            logger.exception(f"Error en git para tarea {task.task_id}: {e.stderr}")
+        except Exception as e:
+            task.error = f"Error creando PR: {e}"
+            logger.exception("Error en creación de PR")
+
+    def _get_github_repo(self, repo_url: str):
+        if not self.github_token:
+            raise ValueError("GitHub token no disponible")
+        g = Github(self.github_token)
+        match = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(\.git)?$", repo_url)
+        if not match:
+            raise ValueError(f"URL de repositorio no válida: {repo_url}")
+        owner, repo_name = match.group(1), match.group(2)
+        return g.get_repo(f"{owner}/{repo_name}")
+
+    def _generate_report(self) -> Dict:
+        total = len(self.tasks)
+        completed = sum(1 for t in self.tasks.values() if t.state == TaskState.COMPLETED)
+        failed = sum(1 for t in self.tasks.values() if t.state == TaskState.FAILED)
+        pr_created = sum(1 for t in self.tasks.values() if t.pr_url is not None)
+
+        prs = [{"task_id": t.task_id, "pr_url": t.pr_url} for t in self.tasks.values() if t.pr_url]
+
+        tasks_list = []
+        for t in self.tasks.values():
+            tasks_list.append({
+                "task_id": t.task_id,
+                "model": t.model_display,
+                "vuln_id": t.vulnerability.id,
+                "cwe": t.vulnerability.id,
+                "state": t.state.value,
+                "pr_url": t.pr_url,
+                "error": t.error
+            })
+
+        report = {
+            "total_tasks": total,
+            "completed": completed,
+            "failed": failed,
+            "pr_created": pr_created,
+            "prs": prs,
+            "tasks": tasks_list
         }
-        
-        issue_severity = issue.get('severity', 'UNKNOWN')
-        issue_level = severity_order.get(issue_severity, 99)
-        min_level = severity_order.get(min_severity, 99)
-        
-        # Si el issue es menos severo que el mínimo, excluirlo
-        if issue_level > min_level:
-            return False
-        
-        # Filtros específicos por herramienta
-        if tool_name == 'cppcheck':
-            return self._filter_cppcheck_issue(issue)
-        elif tool_name == 'bandit':
-            return self._filter_bandit_issue(issue)
-        elif tool_name == 'semgrep':
-            return self._filter_semgrep_issue(issue)
-        
-        return True
 
-    def _filter_cppcheck_issue(self, issue: Dict[str, Any]) -> bool:
-        """Filtra issues específicos de cppcheck que no son relevantes"""
-        
-        rule_id = issue.get('rule_id', '').lower()
-        message = issue.get('message', '').lower()
-        filepath = issue.get('file', '').lower()
-        
-        # 1. Excluir archivos generados por protobuf
-        protobuf_patterns = ['.pb.cc', '.pb.h', '_generated', '_pb2']
-        if any(pattern in filepath for pattern in protobuf_patterns):
-            print(f"    [FILTER] Excluyendo archivo protobuf: {filepath}")
-            return False
-        
-        # 2. Ignorar 'invalid C code' en archivos C++ válidos
-        if 'invalid c code' in message:
-            # Obtener extensión del archivo
-            import os
-            ext = os.path.splitext(filepath)[1]
-            cpp_extensions = ['.cc', '.cpp', '.cxx', '.hpp', '.hxx']
-            
-            if ext in cpp_extensions:
-                print(f"    [FILTER] Ignorando 'invalid C code' en archivo C++: {filepath}")
-                return False
-            
-            # También si el mensaje contiene palabras clave de C++
-            cpp_keywords = ['namespace', 'class', 'template', 'public:', 'private:', 'protected:']
-            if any(keyword in message for keyword in cpp_keywords):
-                print(f"    [FILTER] Ignorando código C++ válido: {message[:100]}")
-                return False
-        
-        # 3. Excluir errores de versión de protoc
-        if '#error this file was generated' in message:
-            print(f"    [FILTER] Excluyendo error de versión de protoc: {message[:100]}")
-            return False
-        
-        # 4. Excluir missing includes en archivos generados
-        if 'missingincludesystem' in rule_id:
-            if any(pattern in filepath for pattern in protobuf_patterns):
-                print(f"    [FILTER] Excluyendo missing include en archivo generado: {filepath}")
-                return False
-        # Añadir esto después del punto 4 en _filter_cppcheck_issue
-        # (justo antes de "Mantener solo issues de seguridad reales")
+        # Guardar en archivo
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_path = self.results_dir / f"orchestration_results_{timestamp}.json"
+        with open(report_path, "w") as f:
+            json.dump(report, f, indent=2, default=str)
+        logger.info(f"📊 Reporte guardado en {report_path}")
 
-        # 5. Filtrar "unknown macro" warnings en archivos BPF
-        if 'unknown macro' in message:
-            # Verificar si es archivo BPF/eBPF
-            if filepath.endswith('.bpf.c') or '.bpf.' in filepath:
-                print(f"    [FILTER] Excluyendo unknown macro warning en archivo BPF: {filepath}")
-                return False
-    
-            # También si menciona la macro SEC (común en eBPF)
-            if 'sec' in message.lower():
-                print(f"    [FILTER] Excluyendo advertencia de macro SEC (eBPF): {message[:100]}")
-                return False
+        return report
 
-        # 6. Filtrar issues "unknownMacro" que no son de seguridad
-        if rule_id == 'unknownmacro' and severity in ['CRITICAL', 'HIGH']:
-            # Verificar si tiene keywords de seguridad
-            security_keywords = ['buffer', 'overflow', 'injection', 'vulnerability', 'security']
-            has_security_context = any(keyword in message for keyword in security_keywords)
-    
-            if not has_security_context:
-                print(f"    [FILTER] Excluyendo unknownMacro sin contexto de seguridad: {message[:100]}")
-                return False
-
-        # 7. Mantener solo issues de seguridad reales (ajustado para C/C++)
-        security_keywords = [
-            'buffer',
-            'overflow',
-            'injection',
-            'format',
-            'string',
-            'race',
-            'deadlock',
-            'memory',
-            'leak',
-            'use after free',
-            'double free',
-            'null pointer',
-            'dereference',
-            'insecure',
-            'vulnerability',
-            'security',
-            'dangerous',
-            'unsafe'
-        ]
-        
-        # Si el issue NO tiene palabras clave de seguridad, puede ser ruido
-        has_security_keyword = any(keyword in message for keyword in security_keywords)
-        
-        # Si es de severidad baja (INFO) y no tiene keywords de seguridad, excluirlo
-        if issue.get('severity') == 'INFO' and not has_security_keyword:
-            return False
-    
-        return True
-
-    def _filter_bandit_issue(self, issue: Dict[str, Any]) -> bool:
-        """Filtra issues específicos de bandit"""
-        
-        rule_id = issue.get('rule_id', '').lower()
-        message = issue.get('message', '').lower()
-        
-        # Bandit issues a mantener (todos son de seguridad)
-        return True  # Bandit ya filtra por seguridad
-
-    def _filter_semgrep_issue(self, issue: Dict[str, Any]) -> bool:
-        """Filtra issues específicos de semgrep"""
-        
-        rule_id = issue.get('rule_id', '').lower()
-        message = issue.get('message', '').lower()
-        
-        # Semgrep issues a mantener
-        return True  # Semgrep ya filtra por seguridad
-
-# Función de conveniencia para uso rápido
-def run_sast_analysis(
-    project_path: str = ".", config_path: str = None
-) -> Dict[str, Any]:
-    """
-    Función de conveniencia para ejecutar análisis SAST.
-
-    Args:
-        project_path: Ruta al proyecto a analizar
-        config_path: Ruta base para configuraciones
-
-    Returns:
-        Resultados del análisis
-    """
-    orchestrator = SASTOrchestrator(project_path, config_path)
-    return orchestrator.analyze_directory()
+    def _empty_result(self) -> Dict:
+        return {
+            "total_tasks": 0,
+            "completed": 0,
+            "failed": 0,
+            "pr_created": 0,
+            "prs": [],
+            "tasks": []
+        }

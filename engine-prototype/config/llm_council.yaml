@@ -1,56 +1,224 @@
 # config/llm_council.yaml
-llms:
-  - name: "Claude-3.5-Sonnet"
-    model: "anthropic/claude-3.5-sonnet"
-    api_key_env: "OPENROUTER_API_KEY"
+# Configuración de modelos, consejo, máquina de estados y prompts.
+
+# ----------------------------------------------------------------------
+# Modelos SOTA disponibles para el consejo de seguridad
+# ----------------------------------------------------------------------
+llm_configs:
+  gemma-3-27b:
+    provider: openrouter
+    model: google/gemma-3-27b-it:free
+    max_tokens: 4000
+    temperature: 0.1
     priority: 1
-    
-  - name: "GPT-4-Turbo"
-    model: "openai/gpt-4-turbo"
-    api_key_env: "OPENROUTER_API_KEY"
+
+  llama-3.2-3b:
+    provider: openrouter
+    model: meta-llama/llama-3.2-3b-instruct:free
+    max_tokens: 4000
+    temperature: 0.1
     priority: 2
-    
-  - name: "DeepSeek-Coder"
-    model: "deepseek/deepseek-coder"
-    api_key_env: "OPENROUTER_API_KEY"
+
+  hermes-3-405b:
+    provider: openrouter
+    model: nousresearch/hermes-3-llama-3.1-405b:free
+    max_tokens: 4000
+    temperature: 0.1
     priority: 3
-    
-  - name: "Gemini-Pro"
-    model: "google/gemini-pro"
-    api_key_env: "OPENROUTER_API_KEY"
+  qwen-coder:
+    provider: openrouter
+    model: qwen/qwen3-coder:free
+    max_tokens: 4000
+    temperature: 0.1
     priority: 4
-    
-  - name: "Llama-3.1-70B"
-    model: "meta-llama/llama-3.1-70b-instruct"
-    api_key_env: "OPENROUTER_API_KEY"
+
+  llama-3-3:
+    provider: openrouter
+    model: meta-llama/llama-3.3-70b-instruct:free
+    max_tokens: 4000
+    temperature: 0.1
     priority: 5
-    
-  - name: "CodeLlama-70B"
-    model: "meta-llama/codellama-70b-instruct"
-    api_key_env: "OPENROUTER_API_KEY"
+
+  mistral-small:
+    provider: openrouter
+    model: mistralai/mistral-small-3.1-24b-instruct:free
+    max_tokens: 4000
+    temperature: 0.1
     priority: 6
 
-settings:
-  min_llms: 3
-  preferred_odd_number: 5
-  timeout_per_llm: 120
-  max_retries: 2
   
-  language_preferences:
-    c_cpp:
-      - "Claude-3.5-Sonnet"
-      - "DeepSeek-Coder"
-      - "GPT-4-Turbo"
-    python:
-      - "Claude-3.5-Sonnet"
-      - "GPT-4-Turbo"
-      - "Gemini-Pro"
-    javascript:
-      - "Claude-3.5-Sonnet"
-      - "GPT-4-Turbo"
-      - "Llama-3.1-70B"
 
-  voting:
-    enabled: true
-    method: "majority"
-    fallback: "first_successful"
+# ----------------------------------------------------------------------
+# Configuración del consejo (selección, votación, tiempos)
+# ----------------------------------------------------------------------
+council_settings:
+  min_llms: 3
+  max_llms: 3
+  preferred_count: 3          # Impar para votación
+  timeout_seconds: 300
+  enable_discussion: true
+
+# ----------------------------------------------------------------------
+# Configuración de la máquina de estados (por fase)
+# ----------------------------------------------------------------------
+state_machine_settings:
+  max_analysis_time: 60
+  max_test_design_time: 45
+  max_fix_design_time: 90
+  max_documentation_time: 30
+  enable_state_persistence: true
+  state_checkpoint_dir: "./tdh_states"
+
+# ----------------------------------------------------------------------
+# Prompts completos para cada estado del agente SOTA
+# ----------------------------------------------------------------------
+# Estos prompts ya incluyen TODAS las instrucciones necesarias.
+# El script sota_agent.py solo debe formatearlos con las variables.
+# ----------------------------------------------------------------------
+state_prompts:
+
+  # Estado: Análisis inicial de la vulnerabilidad
+  analyzing:
+    system: |
+      Eres un experto en seguridad de código. Analiza la siguiente vulnerabilidad en detalle:
+
+      {vulnerability}
+
+      Proporciona:
+      1. Una descripción técnica de la causa raíz.
+      2. El impacto potencial.
+      3. Una estrategia de mitigación de alto nivel.
+      4. El archivo y línea exacta donde se produce.
+
+      No incluyas código aún. Sé conciso pero completo.
+    temperature: 0.1
+
+  # Estado: Diseño y validación del test
+  test_designing:
+    system: |
+      Eres un ingeniero de pruebas de seguridad. Debes crear un test que reproduzca la vulnerabilidad.
+
+      Vulnerabilidad a reproducir:
+      {vulnerability}
+
+      El repositorio está disponible en: {repo_path}
+      El proyecto contiene un Makefile y herramientas de compilación estándar.
+
+      **Instrucciones de salida (obligatorias):**
+      - El código del test debe ir dentro de un bloque de código etiquetado como ```test```.
+      - El comando exacto (shell) para compilar y ejecutar el test debe ir dentro de un bloque ```command```.
+      - El test debe ser autocontenido (incluir todos los imports necesarios).
+      - Si el proyecto requiere dependencias adicionales, inclúyelas en el comando (ej: `pip install`).
+
+      Recibirás feedback sobre la ejecución. Si el test no reproduce la vulnerabilidad, itera hasta lograrlo o hasta que se alcance el límite de intentos.
+    temperature: 0.2
+
+  # Estado: Diseño y verificación del fix
+  fix_designing:
+    system: |
+      Eres un ingeniero de seguridad que escribe código seguro. Debes corregir la vulnerabilidad.
+
+      Vulnerabilidad a corregir:
+      {vulnerability}
+
+      Test que la reproduce:
+      {test_code}
+
+      Comando para ejecutar el test:
+      {test_command}
+
+      **Instrucciones de salida (obligatorias):**
+      - El código corregido (archivo completo) debe ir dentro de un bloque ```fix```.
+      - El comando para verificar el fix (normalmente el mismo test) dentro de un bloque ```command```.
+      - Si el archivo a modificar no está explícito, infiérelo del contexto.
+
+      Aplicarás el fix en el repositorio. Recibirás feedback de la ejecución del test tras el fix. Si la vulnerabilidad persiste, itera.
+    temperature: 0.1
+
+  # Estado: Documentación final
+  documenting:
+    system: |
+      Eres un documentador técnico especializado en seguridad. Redacta una explicación clara y profesional.
+
+      Vulnerabilidad:
+      {vulnerability}
+
+      Test utilizado:
+      {test_code}
+
+      Fix aplicado:
+      {fix_code}
+
+      Resultado de la verificación:
+      - Test reproducido: {test_verified}
+      - Fix verificado: {fix_verified}
+
+      Escribe una explicación que incluya:
+      - Qué hacía el código vulnerable.
+      - Cómo el test demuestra el problema.
+      - En qué consiste el fix y por qué es seguro.
+      - Lecciones aprendidas.
+
+      **No incluyas bloques de código** (ya se incluirán en el PR). Solo texto plano.
+    temperature: 0.1
+
+# ----------------------------------------------------------------------
+# Prompts para la SOTA orquestadora (sustituye o complementa a sast_orchestrator.py)
+# ----------------------------------------------------------------------
+orchestrator_prompts:
+  main:
+    system: |
+      Eres el orquestador principal del TDH Engine. Tu misión es coordinar el flujo completo de análisis y reparación de vulnerabilidades.
+
+      **Entrada:**
+      - Resultados SAST (JSON con vulnerabilidades, filtradas a HIGH/CRITICAL).
+      - Repositorio de destino (URL o ruta local).
+      - Consejo de SOTAS disponible (llm_configs).
+      - Configuración del consejo (council_settings).
+
+      **Tareas:**
+
+      1. **Inicialización**
+         - Clona el repositorio (si es remoto) o verifica acceso local.
+         - Crea un directorio de trabajo.
+
+      2. **Filtrado y priorización**
+         - Selecciona solo vulnerabilidades HIGH y CRITICAL.
+         - Ordena por gravedad y CWE.
+
+      3. **Asignación de tareas**
+         - Por cada vulnerabilidad, selecciona una SOTA del consejo (round‑robin, prioridad, o basado en experiencia).
+         - Crea un **worktree** aislado por vulnerabilidad: `git worktree add ../repo-{vuln-id} -b sota/{model}/{cwe} HEAD`.
+         - Prepara el contenedor Docker con la imagen `tdh-base`, montando el worktree.
+
+      4. **Ejecución de SOTAS**
+         - Lanza los contenedores en paralelo (o secuencial según recursos).
+         - Inyecta vía stdin: modelo, vulnerabilidad, ruta del worktree, API key.
+         - Captura logs en tiempo real y actualiza la máquina de estados.
+
+      5. **Gestión de estados**
+         - Mantén un registro de cada tarea: estado (pendiente, en test, en fix, documentado, PR listo, fallido).
+         - Si una SOTA falla, reasigna a otra (hasta `max_retries`).
+
+      6. **Generación de Pull Requests**
+         - Por cada vulnerabilidad con fix verificado:
+           - Haz commit de los cambios en el worktree.
+           - Haz push de la rama al remoto.
+           - Crea una Pull Request vía API de GitHub, incluyendo:
+             - Título: `fix: {cwe} - {descripción corta}`
+             - Cuerpo: explicación generada por la SOTA + test y fix en formato markdown.
+
+      7. **Limpieza**
+         - Elimina worktrees y contenedores terminados.
+         - Persiste el estado si está configurado.
+
+      **Formato de salida (para el engine):**
+      - Logs detallados con prefijo `[ORCHESTRATOR]`.
+      - Al final, un JSON resumen con:
+        - vulnerabilidades procesadas,
+        - fixes exitosos,
+        - URLs de PRs,
+        - errores.
+
+      Ejecuta este flujo de forma autónoma. No necesitas intervención humana.
+    temperature: 0.1

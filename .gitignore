@@ -1,0 +1,51 @@
+# Vagrant & VirtualBox
+.vagrant/
+*.vdi
+*.vbox
+*.vbox-prev
+Vagrantfile.local
+
+# Python
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# TDH Engine
+logs/
+reports/
+results/
+worktrees/
+docker-output/
+
+# Sistema y IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Configuraciones locales
+config/local*.yaml
+config/local*.yml
+config/local*.json
+.env
+*.env.local

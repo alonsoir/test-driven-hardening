@@ -65,6 +65,47 @@ TDH is designed for gradual adoption:
 3. Document fixes with evidence and context
 4. Consider implementing a Hardening Journal for institutional learning
 
+### **TDH Engine – Multi-SOTA Hardening Flow**
+
+```mermaid
+flowchart TD
+    A[Inicio: Vulnerabilidad detectada / análisis inicial] --> B[Engine asigna vulnerabilidad a SOTA 1]
+    B --> C[SOTA recibe prompt inicial y crea PoC test]
+    C --> D[PoC test compilado y ejecutado → demuestra vulnerabilidad (ROJO/VERDE)]
+    D --> E[Engine recibe PoC y lo comparte con otras SOTAs]
+    E --> F[Otras SOTAs verifican el PoC, validación reproducible]
+    F --> G[SOTAs generan fix individual según su estrategia]
+    G --> H[Engine coordina logs, estado de cada SOTA y posibles interdependencias]
+    H --> I[Engine aplica fix en worktree y genera commit]
+    I --> J[Pull Request automática con: fix, test, logs y análisis de SOTA]
+    J --> K[Revisión humana final y decisión de merge]
+    K --> L[Actualización del Hardening Journal / aprendizaje institucional]
+```
+
+### **Leyenda / Conceptos clave**
+
+* **PoC test (Prueba de concepto)**:
+
+  * Compilable y ejecutable en lenguaje base (C/C++ actualmente).
+  * **ROJO** → vulnerabilidad corregida; **VERDE** → vulnerabilidad presente.
+
+* **SOTA (State-of-the-Art AI model)**:
+
+  * Genera fixes, tests y documentación.
+  * Se comunica con engine mediante archivos de log o `chat-incoming`.
+  * Interacción multi-SOTA gestionada por engine.
+
+* **Engine**:
+
+  * Coordina worktrees, contenedores, estado de cada SOTA y comunicación.
+  * Propaga PoC y fixes entre SOTAs.
+  * Automatiza commits y creación de PRs, pero no toma decisiones de análisis.
+
+* **Human-in-the-loop**:
+
+  * Revisión final de PR.
+  * Decide qué fixes se aceptan, basándose en evidencia reproducible.
+
 ## 📊 Status
 
 **Current**: Pre-print research framework  
