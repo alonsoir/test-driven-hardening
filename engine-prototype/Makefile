@@ -3,7 +3,6 @@
 # Funciona en HOST (macOS) y en GUEST (Vagrant)
 # ============================================
 
-VENV_PATH = venv
 PYTHON = python3
 PIP = pip3
 DOCKER = docker
@@ -14,9 +13,11 @@ PROJECT_NAME = tdh-engine
 ifneq ($(wildcard /home/vagrant/$(PROJECT_NAME)/.),)
 	IS_VAGRANT = true
 	PROJECT_ROOT = /home/vagrant/$(PROJECT_NAME)
+	VENV_PATH = /home/vagrant/tdh-venv
 else
 	IS_VAGRANT = false
 	PROJECT_ROOT = .
+	VENV_PATH = venv
 endif
 
 # Colores
@@ -49,15 +50,19 @@ help:
 	@echo "  make clean           - Limpia archivos temporales y contenedores legacy"
 	@echo ""
 	@echo "$(YELLOW)🚀 VAGRANT (desde HOST):$(NC)"
-	@echo "  make vagrant-up      - Inicia VM"
+	@echo "  make vagrant-up      - Inicia y provisiona la VM completamente"
 	@echo "  make vagrant-ssh     - Conecta a VM"
 	@echo "  make vagrant-halt    - Detiene VM"
 	@echo "  make vagrant-destroy - Destruye VM"
 	@echo "  make vagrant-status  - Estado VM"
+	@echo "  make vagrant-provision - Reprovisiona la VM sin destruir"
 	@echo ""
-	@echo "$(YELLOW)🔧 DESARROLLO EN VM:$(NC)"
-	@echo "  make vm-setup        - Configura entorno dentro de VM (deps + imagen)"
+	@echo "$(YELLOW)🔧 DENTRO DE LA VM:$(NC)"
+	@echo "  make vm-check        - Verifica que el entorno está listo"
+	@echo "  make vm-status       - Muestra estado detallado del entorno"
+	@echo "  make vm-rebuild-image - Reconstruye la imagen Docker manualmente"
 	@echo "  make vm-example      - Ejecuta análisis de ejemplo con orquestación"
+	@echo "  make vm-shell        - Abre una shell con el entorno virtual activado"
 	@echo ""
 	@echo "$(YELLOW)📊 INFORMACIÓN:$(NC)"
 	@echo "  make env-info        - Muestra entorno"
@@ -83,13 +88,13 @@ setup-deps:
 		$(VENV_PATH)/bin/pip install -r requirements.txt; \
 	else \
 		echo "$(YELLOW)⚠️  requirements.txt no encontrado, instalando mínimo...$(NC)"; \
-		$(VENV_PATH)/bin/pip install docker aiofiles python-dotenv; \
+		$(VENV_PATH)/bin/pip install docker aiofiles python-dotenv aiohttp; \
 	fi
 	@echo "$(GREEN)✅ Dependencias instaladas.$(NC)"
 
 check:
 	@echo "$(BLUE)🔍 Verificando dependencias...$(NC)"
-	@$(VENV_PATH)/bin/python -c "import docker, aiofiles, dotenv; print('✅ docker, aiofiles, python-dotenv OK')" \
+	@$(VENV_PATH)/bin/python -c "import docker, aiofiles, dotenv, aiohttp; print('✅ docker, aiofiles, python-dotenv, aiohttp OK')" \
 		|| echo "$(RED)❌ Faltan dependencias$(NC)"
 
 build-base:
@@ -118,6 +123,11 @@ clean:
 # Comandos Vagrant (desde HOST)
 vagrant-up:
 	@cd $(VAGRANT_DIR) && vagrant up
+	@echo "$(GREEN)✅ VM levantada y provisionada. Conéctate con 'make vagrant-ssh'.$(NC)"
+
+vagrant-provision:
+	@cd $(VAGRANT_DIR) && vagrant provision
+	@echo "$(GREEN)✅ VM reprovisionada.$(NC)"
 
 vagrant-ssh:
 	@cd $(VAGRANT_DIR) && vagrant ssh
@@ -133,18 +143,43 @@ vagrant-status:
 
 # ----------------------------------------------------------------------
 # Comandos dentro de la VM
-vm-setup:
-	@echo "$(BLUE)🔧 Verificando entorno en VM...$(NC)"
+vm-check:
+	@echo "$(BLUE)🔍 Verificando entorno en VM...$(NC)"
 	@if [ "$(IS_VAGRANT)" != "true" ]; then \
 		echo "$(RED)❌ Debes ejecutar esto dentro de la VM$(NC)"; \
 		exit 1; \
 	fi
-	@if [ ! -d "/home/vagrant/tdh-venv" ]; then \
-		echo "$(RED)❌ Entorno virtual no encontrado. Ejecuta la provisión primero.$(NC)"; \
+	@echo -n "Python venv ($(VENV_PATH)): "
+	@if [ -d "$(VENV_PATH)" ]; then \
+		echo "$(GREEN)✅$(NC)"; \
+	else \
+		echo "$(RED)❌$(NC)"; \
+	fi
+	@echo -n "Imagen Docker tdh-base: "
+	@if docker images -q tdh-base:latest 2>/dev/null | grep -q .; then \
+		echo "$(GREEN)✅$(NC)"; \
+	else \
+		echo "$(RED)❌$(NC)"; \
+	fi
+	@make check
+	@make docker-info
+
+vm-status:
+	@echo "$(BLUE)📊 ESTADO DEL ENTORNO EN VM$(NC)"
+	@echo "Proyecto: $(PROJECT_ROOT)"
+	@echo "Entorno virtual: $(VENV_PATH)"
+	@echo "Python: $(shell which python3)"
+	@echo ""
+	@make vm-check
+
+vm-rebuild-image:
+	@echo "$(BLUE)🐳 Reconstruyendo imagen Docker tdh-base...$(NC)"
+	@if [ "$(IS_VAGRANT)" != "true" ]; then \
+		echo "$(RED)❌ Debes ejecutar esto dentro de la VM$(NC)"; \
 		exit 1; \
 	fi
-	@make build-base
-	@echo "$(GREEN)✅ VM lista.$(NC)"
+	@cd $(PROJECT_ROOT) && docker build -f docker/Dockerfile.base -t tdh-base:latest .
+	@echo "$(GREEN)✅ Imagen reconstruida.$(NC)"
 
 vm-example:
 	@echo "$(BLUE)🎪 Ejemplo: orquestación multi‑SOTA (dry-run)$(NC)"
@@ -152,10 +187,20 @@ vm-example:
 		echo "$(RED)❌ Debes ejecutar esto dentro de la VM$(NC)"; \
 		exit 1; \
 	fi
-	@. /home/vagrant/tdh-venv/bin/activate && \
-	 python /home/vagrant/tdh-engine/tdh_unified.py sast-orchestrated \
-		https://github.com/alonsoir/test-zeromq-c-.git \
-		--dry-run
+	@echo "Usando entorno virtual: $(VENV_PATH)"
+	@bash -c "source $(VENV_PATH)/bin/activate && \
+	          cd $(PROJECT_ROOT) && \
+	          python tdh_unified.py sast-orchestrated \
+	          https://github.com/alonsoir/test-zeromq-c-.git \
+	          --dry-run"
+
+vm-shell:
+	@echo "$(BLUE)🐚 Abriendo shell con entorno virtual activado...$(NC)"
+	@if [ "$(IS_VAGRANT)" != "true" ]; then \
+		echo "$(RED)❌ Debes ejecutar esto dentro de la VM$(NC)"; \
+		exit 1; \
+	fi
+	@bash --rcfile <(echo "source $(VENV_PATH)/bin/activate; echo '✅ Entorno virtual activado. Escribe 'deactivate' para salir.'")
 
 # ----------------------------------------------------------------------
 # Información
@@ -165,6 +210,7 @@ env-info:
 	@echo "Python: $(shell which python3)"
 	@echo "Docker: $(shell which docker)"
 	@echo "Vagrant: $(shell which vagrant)"
+	@echo "Virtual env: $(VENV_PATH)"
 
 docker-info:
 	@$(DOCKER) info --format '{{.ServerVersion}}' 2>/dev/null \
@@ -181,7 +227,7 @@ list-tools:
 	done
 
 # ----------------------------------------------------------------------
-# Alias
+# Alias (para usar en host)
 up: vagrant-up
 ssh: vagrant-ssh
 halt: vagrant-halt

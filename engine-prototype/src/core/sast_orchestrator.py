@@ -391,19 +391,38 @@ class SASTOrchestrator:
         return worktree_path
 
     def _generate_task_input(self, task: SOTATask) -> Dict:
+        # Obtener ruta relativa del archivo dentro del worktree
+        rel_file = self._get_relative_path(task.worktree_path, task.vulnerability.file)
+        
         return {
-            "model": task.model_key,  # antes era task.model_display
+            "model": task.model_key,
             "vulnerability": {
                 "id": task.vulnerability.id,
-                "file": task.vulnerability.file,
+                "file": rel_file,  # ← Ahora es relativa
                 "line": task.vulnerability.line,
                 "description": task.vulnerability.description,
                 "severity": task.vulnerability.severity
             },
-            "repo_path": str(task.worktree_path),
+            "repo_path": "/workspace",
             "openrouter_api_key": self.openrouter_key
         }
 
+    def _get_relative_path(self, worktree_path: Path, original_path: str) -> str:
+        """
+        Busca el archivo por nombre en el worktree y devuelve la ruta relativa.
+        Si no se encuentra, retorna el nombre base como fallback.
+        """
+        file_name = os.path.basename(original_path)
+        matches = list(worktree_path.rglob(file_name))
+        if matches:
+            # Usar el primer match (podría haber múltiples, pero es poco probable)
+            rel = matches[0].relative_to(worktree_path)
+            logger.info(f"✅ Archivo encontrado: {rel}")
+            return str(rel)
+        else:
+            logger.warning(f"⚠️ No se encontró {file_name} en {worktree_path}, usando nombre base")
+            return file_name
+        
     async def _run_single_task(self, task: SOTATask, dry_run: bool = False):
         """
         Ejecuta un agente SOTA en un contenedor Docker para una vulnerabilidad específica.

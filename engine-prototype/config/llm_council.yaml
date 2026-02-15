@@ -5,48 +5,54 @@
 # Modelos SOTA disponibles para el consejo de seguridad
 # ----------------------------------------------------------------------
 llm_configs:
+  claude-3.5-sonnet:
+    provider: openrouter
+    model: anthropic/claude-3.5-sonnet
+    max_tokens: 4000
+    temperature: 0.1
+    priority: 1
+
   gemma-3-27b:
     provider: openrouter
     model: google/gemma-3-27b-it:free
     max_tokens: 4000
     temperature: 0.1
-    priority: 1
+    priority: 2
 
   llama-3.2-3b:
     provider: openrouter
     model: meta-llama/llama-3.2-3b-instruct:free
     max_tokens: 4000
     temperature: 0.1
-    priority: 2
+    priority: 3
 
   hermes-3-405b:
     provider: openrouter
     model: nousresearch/hermes-3-llama-3.1-405b:free
     max_tokens: 4000
     temperature: 0.1
-    priority: 3
+    priority: 4
+    
   qwen-coder:
     provider: openrouter
     model: qwen/qwen3-coder:free
     max_tokens: 4000
     temperature: 0.1
-    priority: 4
+    priority: 5
 
   llama-3-3:
     provider: openrouter
     model: meta-llama/llama-3.3-70b-instruct:free
     max_tokens: 4000
     temperature: 0.1
-    priority: 5
+    priority: 6
 
   mistral-small:
     provider: openrouter
     model: mistralai/mistral-small-3.1-24b-instruct:free
     max_tokens: 4000
     temperature: 0.1
-    priority: 6
-
-  
+    priority: 7
 
 # ----------------------------------------------------------------------
 # Configuración del consejo (selección, votación, tiempos)
@@ -102,21 +108,46 @@ state_prompts:
       {vulnerability}
 
       El repositorio está disponible en: {repo_path}
-      El proyecto contiene un Makefile y herramientas de compilación estándar.
+      El archivo vulnerable es: {repo_path}/{vuln_file}
+      El proyecto contiene un Makefile y herramientas de compilación estándar (gcc, make, etc.) para lenguajes compilados.
+      **Debes inferir el lenguaje de programación** a partir de la extensión del archivo vulnerable (campo "file" en la vulnerabilidad).
 
       **Instrucciones de salida (obligatorias):**
-      - El código del test debe ir dentro de un bloque de código etiquetado como ```test```.
-      - El comando exacto (shell) para compilar y ejecutar el test debe ir dentro de un bloque ```command```.
-      - El test debe ser autocontenido (incluir todos los imports necesarios).
-      - Si el proyecto requiere dependencias adicionales, inclúyelas en el comando (ej: `pip install`).
+      - El test debe demostrar la vulnerabilidad en el archivo indicado. Puedes escribir un programa que compile o ejecute ese archivo y verifique que se produce el error esperado (por ejemplo, un error de sintaxis).
+      - El **código del test** puede ser un script (bash, python) o un programa en el mismo lenguaje que el vulnerable. Debe escribirse en un bloque de código con el lenguaje apropiado y etiquetado con `[test]` en una línea aparte.
+      - El **comando** para ejecutar el test debe ir en un bloque `[command]`. Si el test es un script, el comando será algo como `bash test.sh` o `python3 test.py`.
+      - El test debe ser autocontenido y no depender de archivos externos no presentes.
 
-      Recibirás feedback sobre la ejecución. Si el test no reproduce la vulnerabilidad, itera hasta lograrlo o hasta que se alcance el límite de intentos.
+      **Ejemplo para una vulnerabilidad de sintaxis en C++:**
+      [test]
+      ```bash
+      #!/bin/bash
+      g++ -c /workspace/firewall-acl-agent/src/core/ipset_wrapper.cpp 2>&1 | grep -q "error"
+      exit $?
+      ```
+      [command]
+      ```bash
+      bash test.sh
+      ```
+
+      **Ejemplo para una vulnerabilidad de desbordamiento de búfer en C:**
+      [test]
+      ```c
+      #include <stdlib.h>
+      int main() { return system("./vulnerable_program argumento_largo"); }
+      ```
+      [command]
+      ```bash
+      gcc -o test test.c && ./test
+      ```
+
+      Recibirás feedback sobre la ejecución. Si el test no reproduce la vulnerabilidad, itera hasta lograrlo o hasta un máximo de 3 intentos.
     temperature: 0.2
 
   # Estado: Diseño y verificación del fix
   fix_designing:
     system: |
-      Eres un ingeniero de seguridad que escribe código seguro. Debes corregir la vulnerabilidad.
+      Eres un ingeniero de seguridad que debe corregir la vulnerabilidad. Tienes el test que la reproduce y debes aplicar un fix que elimine la vulnerabilidad sin romper la funcionalidad.
 
       Vulnerabilidad a corregir:
       {vulnerability}
@@ -127,12 +158,14 @@ state_prompts:
       Comando para ejecutar el test:
       {test_command}
 
+      Archivo a modificar: {repo_path}/{vuln_file}
+
       **Instrucciones de salida (obligatorias):**
-      - El código corregido (archivo completo) debe ir dentro de un bloque ```fix```.
-      - El comando para verificar el fix (normalmente el mismo test) dentro de un bloque ```command```.
+      - El **código corregido** (archivo completo) debe ir en un bloque con etiqueta `fix`.
+      - El **comando** para verificar el fix debe ir en un bloque `[command]` (normalmente el mismo comando del test).
       - Si el archivo a modificar no está explícito, infiérelo del contexto.
 
-      Aplicarás el fix en el repositorio. Recibirás feedback de la ejecución del test tras el fix. Si la vulnerabilidad persiste, itera.
+      Recibirás feedback de la ejecución del test tras aplicar el fix. Si la vulnerabilidad persiste, itera hasta corregirla o hasta un máximo de 3 intentos.
     temperature: 0.1
 
   # Estado: Documentación final

@@ -2,21 +2,20 @@
 # vi: set ft=ruby :
 
 Vagrant.configure("2") do |config|
-  # Box oficial de Ubuntu
+  # Box oficial de Ubuntu 22.04
   config.vm.box = "ubuntu/jammy64"
   config.vm.hostname = "tdh-engine-dev"
-  
-  # Puerto SSH
-  config.vm.network "forwarded_port", guest: 22, host: 2223, id: "ssh"
-  
-  # IMPORTANTE: Usar VirtualBox shared folders en lugar de NFS para OSX
-  # VirtualBox funciona mejor que NFS en OSX sin plugins adicionales
-  project_root = File.expand_path("..", __dir__)
 
+  # Puerto SSH (para evitar conflictos)
+  config.vm.network "forwarded_port", guest: 22, host: 2223, id: "ssh"
+
+  # Sincronizar carpeta raíz del proyecto (excluyendo vagrant/ para evitar recursión)
+  project_root = File.expand_path("..", __dir__)
   config.vm.synced_folder project_root, "/home/vagrant/tdh-engine",
     type: "virtualbox",
     mount_options: ["dmode=775", "fmode=664"]
-  
+
+  # Configuración de VirtualBox
   config.vm.provider "virtualbox" do |vb|
     vb.name = "tdh-engine-ubuntu"
     vb.memory = 8192
@@ -24,65 +23,89 @@ Vagrant.configure("2") do |config|
     vb.customize ["modifyvm", :id, "--ioapic", "on"]
     vb.customize ["modifyvm", :id, "--natdnshostresolver1", "on"]
     vb.customize ["modifyvm", :id, "--natdnsproxy1", "on"]
-    vb.customize ["modifyvm", :id, "--accelerate2dvideo", "on"]
-    vb.customize ["modifyvm", :id, "--graphicscontroller", "vmsvga"]
   end
-  
-  # Scripts de provisionamiento (ajusta las rutas si es necesario)
-  config.vm.provision "shell", path: "provision/01-base.sh", privileged: true
-  config.vm.provision "shell", path: "provision/02-docker.sh", privileged: true
-  config.vm.provision "shell", path: "provision/03-tools.sh", privileged: true
-  config.vm.provision "shell", path: "provision/04-tdh.sh", privileged: false
-  
-  # Configuración de herramientas SAST
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
-    echo "🔧 Instalando herramientas SAST..."
-    
-    # Instalar cppcheck
-    apt-get install -y cppcheck
-    
-    # Instalar flawfinder
-    apt-get install -y flawfinder
-    
-    # Instalar trivy
-    apt-get install -y wget apt-transport-https gnupg lsb-release
-    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add -
-    echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
+
+  # ----------------------------------------------------------------------
+  # PROVISIONAMIENTO ÚNICO (se ejecuta al crear la VM o con vagrant provision)
+  # ----------------------------------------------------------------------
+  config.vm.provision "shell", privileged: true, inline: <<-SHELL
+    set -e  # Salir ante cualquier error
+
+    echo "========================================="
+    echo "  Actualizando sistema e instalando paquetes base"
+    echo "========================================="
+    apt-get update
+    apt-get upgrade -y
+    apt-get install -y \
+      python3 python3-pip python3-venv \
+      docker.io docker-compose \
+      git make build-essential \
+      cppcheck flawfinder \
+      wget apt-transport-https gnupg lsb-release
+
+    echo "========================================="
+    echo "  Instalando Trivy"
+    echo "========================================="
+    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor > /usr/share/keyrings/trivy.gpg
+    echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
     apt-get update
     apt-get install -y trivy
-    
-    echo "✅ Herramientas SAST instaladas"
-  SHELL
-  
-  # Configuración automática del entorno
-  config.vm.provision "shell", run: "always", inline: <<-SHELL
-    echo "🚀 Configurando TDH Engine..."
-    
+
+    echo "========================================="
+    echo "  Configurando Docker"
+    echo "========================================="
+    systemctl enable docker
+    systemctl start docker
+    usermod -aG docker vagrant
+
+    echo "========================================="
+    echo "  Creando entorno virtual Python"
+    echo "========================================="
+    sudo -u vagrant python3 -m venv /home/vagrant/tdh-venv
+
+    echo "========================================="
+    echo "  Instalando dependencias Python"
+    echo "========================================="
+    sudo -u vagrant bash -c "
+      source /home/vagrant/tdh-venv/bin/activate
+      pip install --upgrade pip
+      if [ -f /home/vagrant/tdh-engine/requirements.txt ]; then
+          pip install -r /home/vagrant/tdh-engine/requirements.txt
+      else
+          echo '⚠️  requirements.txt no encontrado, instalando paquetes mínimos'
+          pip install docker aiofiles python-dotenv aiohttp asyncio
+      fi
+    "
+
+    echo "========================================="
+    echo "  Construyendo imagen Docker tdh-base"
+    echo "========================================="
     cd /home/vagrant/tdh-engine
-    
-    # Crear entorno virtual
-    if [ ! -d "venv" ]; then
-      python3 -m venv venv
-    fi
-    
-    # Instalar dependencias
-    source venv/bin/activate
-    pip install --upgrade pip
-    
-    # Instalar requirements si existe
-    if [ -f "requirements.txt" ]; then
-      pip install -r requirements.txt
-    else
-      pip install docker aiofiles aiohttp asyncio
-    fi
-    
-    # Crear alias
+    # El grupo docker se aplica tras reinicio, usamos sudo -u vagrant para evitar permisos
+    sudo -u vagrant docker build -f docker/Dockerfile.base -t tdh-base:latest .
+
+    echo "========================================="
+    echo "  Añadiendo alias al .bashrc"
+    echo "========================================="
     cat << 'EOF' >> /home/vagrant/.bashrc
-alias tdh='cd /home/vagrant/tdh-engine && source venv/bin/activate && python tdh_unified.py'
+alias tdh='cd /home/vagrant/tdh-engine && source /home/vagrant/tdh-venv/bin/activate && python tdh_unified.py'
 alias tdh-help='tdh --help'
-alias tdh-example='tdh sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git'
+alias tdh-example='tdh sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git --dry-run'
+    echo "========================================="
+    echo "  Añadiendo alias y activación opcional al .bashrc"
+    echo "========================================="
+    cat << 'EOF' >> /home/vagrant/.bashrc
+
+# TDH Engine aliases
+alias tdh='cd /home/vagrant/tdh-engine && source /home/vagrant/tdh-venv/bin/activate && python tdh_unified.py'
+alias tdh-help='tdh --help'
+alias tdh-example='tdh sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git --dry-run'
+alias tdh-activate='source /home/vagrant/tdh-venv/bin/activate'
+alias tdh-check='cd /home/vagrant/tdh-engine && make vm-check'
 EOF
-    
-    echo "✨ Configuración completada"
+
+    echo "========================================="
+    echo "✅ VM lista. Conéctate con 'make vagrant-ssh'"
+    echo "========================================="
   SHELL
 end

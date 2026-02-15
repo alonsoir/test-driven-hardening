@@ -1,17 +1,11 @@
-### 🚀 Commit final del día
-
-```bash
 git add .
-git commit -m "feat(orchestrator): multi‑SOTA orchestration ready for real PRs
+git commit -m "feat(sota): mejoras en prompts y manejo de bloques para OpenRouter
 
-- Completed dry‑run validation with full cycle: SAST → worktrees → agent simulation → PR simulation
-- Fixed GitHub authentication: token injected once in all Git operations
-- Mounted llm_council.yaml correctly inside containers (absolute path)
-- Added concurrency control (Semaphore) to avoid API rate limits
-- Improved sota_agent.py with exponential backoff and proper exit codes
-- Verified input.json creation and accessibility in worktrees
-- All components are now production‑ready; last remaining step is adding OpenRouter credit
+- Ajustados prompts test_designing y fix_designing con ejemplos concretos
+- Mejorada función extract_code_blocks para capturar lenguaje y ser más tolerante
+- Añadida detección de extensión de test según lenguaje
+- Incluido placeholder {vuln_file} para pasar ruta del archivo vulnerable
+- Actualizado sota_agent.py para usar el nuevo formato de bloques
+- Varias iteraciones de prueba con vulnerabilidades reales en test-zeromq-c
 
-Next: add minimal credit to OpenRouter and run real orchestration to generate first automatic Pull Requests."
-```
-
+Pendiente: sistema de instrucciones extra tipo claude.md para mejorar adherencia al formato"

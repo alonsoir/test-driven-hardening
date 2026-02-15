@@ -94,22 +94,32 @@ def run_command(cmd, cwd):
     except Exception as e:
         return "", str(e), -1
 
-
-# ----------------------------------------------------------------------
 def extract_code_blocks(text):
-    """Extract code blocks labeled with ```tag```."""
+    """Extrae bloques de código etiquetados como test, command, fix, soportando varios formatos."""
     blocks = {}
-    pattern = r'```(\w+)\s*\n(.*?)```'
-    matches = re.findall(pattern, text, re.DOTALL)
-    for tag, code in matches:
-        tag = tag.lower()
-        if tag in ('test', 'fix', 'command') and tag not in blocks:
-            blocks[tag] = code.strip()
+    # Patrón 1: [test] seguido de triple backticks (con o sin lenguaje)
+    pattern1 = r'\[(test|command|fix)\]\s*```(?:\w*)\n(.*?)```'
+    matches1 = re.findall(pattern1, text, re.DOTALL | re.IGNORECASE)
+    for marker, code in matches1:
+        blocks[marker.lower()] = code.strip()
+    # Patrón 2: triple backticks con etiqueta directa (```test ...```)
+    pattern2 = r'```(test|command|fix)\s*\n(.*?)```'
+    matches2 = re.findall(pattern2, text, re.DOTALL | re.IGNORECASE)
+    for marker, code in matches2:
+        blocks[marker.lower()] = code.strip()
+    # Patrón 3: si no se encontró con los patrones anteriores, buscar bloques de código genéricos
+    if not blocks:
+        pattern3 = r'```(?:\w*)\n(.*?)```'
+        code_blocks = re.findall(pattern3, text, re.DOTALL)
+        if len(code_blocks) >= 2:
+            # Asumir que el primero es test y el segundo command (o fix)
+            blocks["test"] = code_blocks[0].strip()
+            blocks["command"] = code_blocks[1].strip()
     return blocks
 
 
-# ----------------------------------------------------------------------
-def get_prompt(config, state_name, vulnerability, extra_context=""):
+def get_prompt(config, state_name, vulnerability, placeholders=None):
+    """Obtiene el prompt para un estado, reemplazando placeholders manualmente."""
     state_prompts = config.get("state_prompts", {})
     if state_name not in state_prompts:
         log(f"WARNING: No prompt defined for state '{state_name}'.", state=state_name)
@@ -117,18 +127,14 @@ def get_prompt(config, state_name, vulnerability, extra_context=""):
     else:
         system = state_prompts[state_name].get("system", "You are a security expert.")
 
-    # Format the single system string with all needed placeholders
-    try:
-        # extra_context puede ser repo_path, o un dict con más campos
-        if isinstance(extra_context, dict):
-            filled = system.format(vulnerability=vulnerability, **extra_context)
-        else:
-            # Por defecto, asumimos que extra_context es repo_path
-            filled = system.format(vulnerability=vulnerability, repo_path=extra_context)
-    except KeyError as e:
-        log(f"WARNING: Missing placeholder {e} in prompt for state '{state_name}'", state=state_name)
-        filled = system
+    if placeholders is None:
+        placeholders = {}
+    # Asegurar que la vulnerabilidad esté disponible como placeholder
+    placeholders.setdefault("vulnerability", str(vulnerability))
 
+    filled = system
+    for key, value in placeholders.items():
+        filled = filled.replace("{" + key + "}", str(value))
     return filled
 
 
@@ -139,7 +145,11 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
     max_tokens = model_config.get("max_tokens", 4000)
 
     log("Starting test design", model_display, state="test_designing")
-    prompt = get_prompt(config, "test_designing", vulnerability, extra_context=repo_path)
+    placeholders = {
+        "repo_path": repo_path,
+        "vuln_file": vulnerability.get("file", "")  # ruta relativa del archivo vulnerable
+    }
+    prompt = get_prompt(config, "test_designing", vulnerability, placeholders)
 
     test_code, command, success, output_log = "", "", False, ""
 
@@ -149,26 +159,37 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
         
         if not result["success"]:
             log(f"LLM call failed (sleeping): {result['error']}", model_display, state="test_designing")
-            time.sleep(2 ** (attempt - 1))
+            time.sleep(5 * attempt)
             continue
 
         response = result["content"]
+        debug_path = Path(repo_path) / f"llm_response_test_attempt{attempt}.txt"
+        debug_path.write_text(response)
+
         blocks = extract_code_blocks(response)
         test_code = blocks.get("test", "")
         command = blocks.get("command", "")
 
         if not test_code or not command:
             log("Missing test code or command block", model_display, state="test_designing")
-            prompt = response + "\n\nProvide both a ```test``` and a ```command``` block."
+            prompt = f"ERROR: La respuesta anterior no contenía los bloques requeridos. Debes incluir [test] y [command] con el formato especificado.\n\nRespuesta anterior (incorrecta):\n{response}\n\nGenera una nueva respuesta con el formato correcto."
             continue
 
-        test_path = Path(repo_path) / "tdh_test.c"
+        # Determinar extensión del test según el lenguaje detectado en el bloque de código
+        # Por simplicidad, asumimos .c para C/C++ y .sh para bash. Podríamos mejorarlo.
+        test_filename = "tdh_test.c"  # por defecto
+        if "bash" in response or "sh" in response:
+            test_filename = "tdh_test.sh"
+        elif "python" in response:
+            test_filename = "tdh_test.py"
+        test_path = Path(repo_path) / test_filename
+
         try:
             test_path.write_text(test_code)
             stdout, stderr, retcode = run_command(command, repo_path)
             output_log = stdout + stderr
-            
-            eval_prompt = f"Output:\n{output_log}\nExit code: {retcode}\nDid it reproduce the bug? YES/NO."
+
+            eval_prompt = f"Output:\n{output_log}\nExit code: {retcode}\nDid it reproduce the bug? Answer YES or NO."
             eval_res = call_openrouter(model_display, eval_prompt, api_key, temperature=0.0, max_tokens=100)
             
             if eval_res["success"] and eval_res["content"].strip().upper().startswith("YES"):
@@ -176,9 +197,10 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
                 log("Test successfully reproduced the vulnerability!", model_display, state="test_designing")
                 break
             else:
-                prompt = f"Previous test failed to reproduce. Output:\n{output_log}\nTry again."
+                prompt = f"Previous test failed to reproduce. Output:\n{output_log}\nTry again. Remember the format."
         except Exception as e:
             log(f"Error: {e}", model_display, state="test_designing")
+            prompt = f"Error during execution: {e}. Try again."
 
     return test_code, command, success, output_log
 
@@ -190,8 +212,13 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
     max_tokens = model_config.get("max_tokens", 4000)
 
     log("Starting fix design", model_display, state="fix_designing")
-    context = f"Vulnerability: {vulnerability}\nTest: {test_code}"
-    prompt = get_prompt(config, "fix_designing", vulnerability, extra_context=context)
+    placeholders = {
+        "test_code": test_code,
+        "test_command": test_command,
+        "repo_path": repo_path,
+        "vuln_file": vulnerability.get("file", "")
+    }
+    prompt = get_prompt(config, "fix_designing", vulnerability, placeholders)
 
     fix_code, fix_command, success, output_log = "", "", False, ""
 
@@ -199,18 +226,28 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
         log(f"Attempt {attempt}/{max_iter}", model_display, state="fix_designing")
         result = call_openrouter(model_display, prompt, api_key, temperature, max_tokens)
         
-        if not result["success"]: continue
+        if not result["success"]:
+            log(f"LLM call failed: {result['error']}", model_display, state="fix_designing")
+            time.sleep(5 * attempt)
+            continue
 
-        blocks = extract_code_blocks(result["content"])
+        response = result["content"]
+        debug_path = Path(repo_path) / f"llm_response_fix_attempt{attempt}.txt"
+        debug_path.write_text(response)
+
+        blocks = extract_code_blocks(response)
         fix_code = blocks.get("fix", "")
         fix_command = blocks.get("command", test_command)
 
         if not fix_code:
-            prompt += "\nMissing ```fix``` block."
+            log("Missing fix code block", model_display, state="fix_designing")
+            prompt = f"ERROR: La respuesta anterior no contenía el bloque [fix]. Respuesta:\n{response}\n\nGenera una nueva respuesta con el bloque [fix]."
             continue
 
         vuln_file = vulnerability.get("file")
-        if not vuln_file: break
+        if not vuln_file:
+            log("No file specified in vulnerability", model_display, state="fix_designing")
+            break
 
         file_path = Path(repo_path) / vuln_file
         try:
@@ -221,27 +258,33 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
             stdout, stderr, retcode = run_command(fix_command, repo_path)
             output_log = stdout + stderr
 
-            eval_prompt = f"Output after fix:\n{output_log}\nIs it fixed? YES/NO."
+            eval_prompt = f"Output after fix:\n{output_log}\nIs the vulnerability still present? Answer YES if still present, NO if fixed."
             eval_res = call_openrouter(model_display, eval_prompt, api_key, temperature=0.0, max_tokens=100)
             
-            if eval_res["success"] and eval_res["content"].strip().upper().startswith("NO"): # NO = not present
+            if eval_res["success"] and eval_res["content"].strip().upper().startswith("NO"): # NO = fixed
                 success = True
                 break
             else:
                 prompt = f"Fix failed. Output:\n{output_log}\nTry again."
         except Exception as e:
             log(f"Error: {e}")
+            prompt = f"Error: {e}. Try again."
 
     return fix_code, fix_command, success, output_log
 
 
 # ----------------------------------------------------------------------
-def phase_document(config, model_config, vulnerability, test_code, fix_code, context, api_key):
+def phase_document(config, model_config, vulnerability, test_code, fix_code, t_ok, f_ok, api_key):
     model_display = model_config["model"]
     log("Starting documentation", model_display, state="documenting")
     
-    extra = f"Test: {test_code}\nFix: {fix_code}\nContext: {context}"
-    prompt = get_prompt(config, "documenting", vulnerability, extra_context=extra)
+    placeholders = {
+        "test_code": test_code,
+        "fix_code": fix_code,
+        "test_verified": "YES" if t_ok else "NO",
+        "fix_verified": "YES" if f_ok else "NO"
+    }
+    prompt = get_prompt(config, "documenting", vulnerability, placeholders)
     
     result = call_openrouter(model_display, prompt, api_key)
     return result["content"] if result["success"] else "Documentation failed."
