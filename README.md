@@ -65,14 +65,11 @@ cd test-driven-hardening/engine-prototype
 make vagrant-up      # Crea y provisiona la VM
 make vagrant-ssh     # Conéctate a la VM
 cd /home/vagrant/tdh-engine
-```
-
-### Manual (en máquina local)
-```bash
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 make build-base      # Construye imagen Docker tdh-base
+python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git
 ```
 
 ## 🔑 Configuración

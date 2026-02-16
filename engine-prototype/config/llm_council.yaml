@@ -109,39 +109,58 @@ state_prompts:
 
       El repositorio está disponible en: {repo_path}
       El archivo vulnerable es: {repo_path}/{vuln_file}
+      Línea aproximada: {line}
+
+      Contenido actual del archivo:
+      ```cpp
+      {file_content}
+      ```
+
       El proyecto contiene un Makefile y herramientas de compilación estándar (gcc, make, etc.) para lenguajes compilados.
-      **Debes inferir el lenguaje de programación** a partir de la extensión del archivo vulnerable (campo "file" en la vulnerabilidad).
 
       **Instrucciones de salida (obligatorias):**
-      - El test debe demostrar la vulnerabilidad en el archivo indicado. Puedes escribir un programa que compile o ejecute ese archivo y verifique que se produce el error esperado (por ejemplo, un error de sintaxis).
-      - El **código del test** puede ser un script (bash, python) o un programa en el mismo lenguaje que el vulnerable. Debe escribirse en un bloque de código con el lenguaje apropiado y etiquetado con `[test]` en una línea aparte.
-      - El **comando** para ejecutar el test debe ir en un bloque `[command]`. Si el test es un script, el comando será algo como `bash test.sh` o `python3 test.py`.
-      - El test debe ser autocontenido y no depender de archivos externos no presentes.
+      - El test debe demostrar la vulnerabilidad en el archivo indicado. Puedes escribir un script que compile o ejecute ese archivo y verifique que se produce el error esperado.
+      - Debes generar **dos bloques**:
+        1. Un bloque `[test]` con el código del test (script bash, programa C, Python, etc.).
+        2. Un bloque `[command]` con el comando exacto para ejecutar el test.
 
-      **Ejemplo para una vulnerabilidad de sintaxis en C++:**
+      **Formato obligatorio:**
+
       [test]
-      ```bash
-      #!/bin/bash
-      g++ -c /workspace/firewall-acl-agent/src/core/ipset_wrapper.cpp 2>&1 | grep -q "error"
-      exit $?
+      ```lenguaje
+      # código del test aquí
       ```
+
       [command]
       ```bash
-      bash test.sh
+      comando para ejecutar el test
       ```
 
-      **Ejemplo para una vulnerabilidad de desbordamiento de búfer en C:**
-      [test]
-      ```c
-      #include <stdlib.h>
-      int main() { return system("./vulnerable_program argumento_largo"); }
-      ```
-      [command]
-      ```bash
-      gcc -o test test.c && ./test
-      ```
+      **Ejemplos:**
+      - Para una vulnerabilidad de sintaxis en C++:
+        [test]
+        ```bash
+        #!/bin/bash
+        g++ -c /workspace/firewall-acl-agent/src/core/ipset_wrapper.cpp 2>&1 | grep -q "error"
+        exit $?
+        ```
+        [command]
+        ```bash
+        bash test.sh
+        ```
 
-      Recibirás feedback sobre la ejecución. Si el test no reproduce la vulnerabilidad, itera hasta lograrlo o hasta un máximo de 3 intentos.
+      - Para una vulnerabilidad de desbordamiento de búfer en C:
+        [test]
+        ```c
+        #include <stdlib.h>
+        int main() { return system("./vulnerable_program argumento_largo"); }
+        ```
+        [command]
+        ```bash
+        gcc -o test test.c && ./test
+        ```
+
+      Recibirás feedback sobre la ejecución. Si el test no reproduce la vulnerabilidad, itera hasta lograrlo (máximo 3 intentos).
     temperature: 0.2
 
   # Estado: Diseño y verificación del fix
@@ -152,20 +171,53 @@ state_prompts:
       Vulnerabilidad a corregir:
       {vulnerability}
 
-      Test que la reproduce:
+      Archivo afectado: {repo_path}/{vuln_file}
+      Línea aproximada: {line}
+
+      Contenido actual del archivo:
+      ```cpp
+      {file_content}
+      ```
+
+      Test que reproduce la vulnerabilidad:
       {test_code}
 
       Comando para ejecutar el test:
       {test_command}
 
-      Archivo a modificar: {repo_path}/{vuln_file}
-
       **Instrucciones de salida (obligatorias):**
-      - El **código corregido** (archivo completo) debe ir en un bloque con etiqueta `fix`.
-      - El **comando** para verificar el fix debe ir en un bloque `[command]` (normalmente el mismo comando del test).
-      - Si el archivo a modificar no está explícito, infiérelo del contexto.
+      - El **código corregido** debe ser el contenido completo del archivo después de aplicar la corrección. Colócalo en un bloque `[fix]`.
+      - El **comando** para verificar el fix (normalmente el mismo comando del test) debe ir en un bloque `[command]`.
+      - No incluyas texto fuera de estos bloques. Si no puedes generar un fix, proporciona un análisis en un bloque `[analysis]` explicando por qué.
 
-      Recibirás feedback de la ejecución del test tras aplicar el fix. Si la vulnerabilidad persiste, itera hasta corregirla o hasta un máximo de 3 intentos.
+      **Formato obligatorio:**
+
+      [fix]
+      ```lenguaje
+      // código completo del archivo corregido
+      ```
+
+      [command]
+      ```bash
+      comando para verificar el fix
+      ```
+
+      **Ejemplo para una vulnerabilidad de sintaxis en C++:**
+
+      Archivo original (ipset_wrapper.cpp) tenía un error de sintaxis en línea 73. El test falla al compilar. El fix corrige la sintaxis.
+
+      [fix]
+      ```cpp
+      #include <ipset_wrapper.h>
+      // ... resto del archivo corregido ...
+      ```
+
+      [command]
+      ```bash
+      g++ -c /workspace/firewall-acl-agent/src/core/ipset_wrapper.cpp
+      ```
+
+      Recibirás feedback de la ejecución del test tras aplicar el fix. Si la vulnerabilidad persiste, itera hasta corregirla (máximo 3 intentos).
     temperature: 0.1
 
   # Estado: Documentación final

@@ -1,11 +1,7 @@
-git add .
-git commit -m "feat(sota): mejoras en prompts y manejo de bloques para OpenRouter
+git add docker/sota_agent.py config/llm_council.yaml
+git commit -m "fix(agent): mejorar prompt test_designing y retroalimentación
 
-- Ajustados prompts test_designing y fix_designing con ejemplos concretos
-- Mejorada función extract_code_blocks para capturar lenguaje y ser más tolerante
-- Añadida detección de extensión de test según lenguaje
-- Incluido placeholder {vuln_file} para pasar ruta del archivo vulnerable
-- Actualizado sota_agent.py para usar el nuevo formato de bloques
-- Varias iteraciones de prueba con vulnerabilidades reales en test-zeromq-c
-
-Pendiente: sistema de instrucciones extra tipo claude.md para mejorar adherencia al formato"
+- Añade contenido del archivo vulnerable en el prompt.
+- Instruye a no crear nuevos archivos fuente.
+- Agrega log de salida del test cuando falla.
+- Reduce tiempos de espera en rate limiting."

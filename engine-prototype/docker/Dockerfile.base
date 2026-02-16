@@ -44,6 +44,8 @@ RUN pip3 install --no-cache-dir \
 COPY docker/sota_agent.py /usr/local/bin/sota_agent.py
 RUN chmod +x /usr/local/bin/sota_agent.py
 
+COPY config/openrouter_instructions.md /etc/tdh/openrouter_instructions.md
+
 # Usuario no-root
 RUN useradd -m -s /bin/bash tdh-user && \
     chown -R tdh-user:tdh-user /home/tdh-user

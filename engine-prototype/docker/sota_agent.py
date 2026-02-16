@@ -52,8 +52,16 @@ def load_config(config_path=None):
 
 
 # ----------------------------------------------------------------------
-def call_openrouter(model_id, prompt, api_key, temperature=0.1, max_tokens=4000):
-    """Call OpenRouter API and return content or error."""
+def call_openrouter(model_id, prompt, api_key, temperature=0.1, max_tokens=4000, max_retries=5):
+    """Call OpenRouter API with retries and backoff for rate limiting."""
+    # Leer instrucciones extra si existen
+    instructions_path = Path("/etc/tdh/openrouter_instructions.md")
+    if instructions_path.exists():
+        extra_instructions = instructions_path.read_text()
+        system_prompt = extra_instructions + "\n\n" + prompt
+    else:
+        system_prompt = prompt
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -62,18 +70,32 @@ def call_openrouter(model_id, prompt, api_key, temperature=0.1, max_tokens=4000)
     }
     payload = {
         "model": model_id,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": [{"role": "user", "content": system_prompt}],
         "temperature": temperature,
         "max_tokens": max_tokens,
     }
-    try:
-        resp = requests.post(OPENROUTER_API_BASE, headers=headers, json=payload, timeout=120)
-        resp.raise_for_status()
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
-        return {"success": True, "content": content, "model": model_id}
-    except Exception as e:
-        return {"success": False, "error": str(e)}
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = requests.post(OPENROUTER_API_BASE, headers=headers, json=payload, timeout=120)
+            if resp.status_code == 429:
+                wait = 2 ** attempt * 5  # 10, 20, 40, 80, 160 segundos
+                log(f"Rate limited (429). Retrying in {wait}s (attempt {attempt}/{max_retries})", state="api")
+                time.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            content = data["choices"][0]["message"]["content"]
+            return {"success": True, "content": content, "model": model_id}
+        except requests.exceptions.Timeout:
+            log(f"Timeout, retrying... (attempt {attempt}/{max_retries})", state="api")
+            time.sleep(2 ** attempt)
+        except Exception as e:
+            if attempt == max_retries:
+                return {"success": False, "error": str(e)}
+            log(f"LLM call failed: {e}. Retrying... (attempt {attempt}/{max_retries})", state="api")
+            time.sleep(2 ** attempt)
+    return {"success": False, "error": "Max retries exceeded"}
 
 
 # ----------------------------------------------------------------------
@@ -94,30 +116,38 @@ def run_command(cmd, cwd):
     except Exception as e:
         return "", str(e), -1
 
+
+# ----------------------------------------------------------------------
 def extract_code_blocks(text):
-    """Extrae bloques de código etiquetados como test, command, fix, soportando varios formatos."""
+    """
+    Extrae bloques de código etiquetados como test, command, fix.
+    Retorna un dict con keys: test, command, fix. Cada valor es un dict con 'code' y 'lang'.
+    """
     blocks = {}
-    # Patrón 1: [test] seguido de triple backticks (con o sin lenguaje)
-    pattern1 = r'\[(test|command|fix)\]\s*```(?:\w*)\n(.*?)```'
+    # Patrón: [test] seguido de triple backticks con lenguaje opcional
+    pattern1 = r'\[(test|command|fix)\]\s*```(\w*)\n(.*?)```'
     matches1 = re.findall(pattern1, text, re.DOTALL | re.IGNORECASE)
-    for marker, code in matches1:
-        blocks[marker.lower()] = code.strip()
-    # Patrón 2: triple backticks con etiqueta directa (```test ...```)
-    pattern2 = r'```(test|command|fix)\s*\n(.*?)```'
+    for marker, lang, code in matches1:
+        blocks[marker.lower()] = {"code": code.strip(), "lang": lang}
+    # Patrón: triple backticks con etiqueta directa (```test ...```)
+    pattern2 = r'```(test|command|fix)(?:\s*\n)(.*?)```'
     matches2 = re.findall(pattern2, text, re.DOTALL | re.IGNORECASE)
     for marker, code in matches2:
-        blocks[marker.lower()] = code.strip()
-    # Patrón 3: si no se encontró con los patrones anteriores, buscar bloques de código genéricos
+        blocks[marker.lower()] = {"code": code.strip(), "lang": ""}
+    # Patrón de último recurso: dos bloques de código genéricos
     if not blocks:
-        pattern3 = r'```(?:\w*)\n(.*?)```'
+        pattern3 = r'```(\w*)\n(.*?)```'
         code_blocks = re.findall(pattern3, text, re.DOTALL)
         if len(code_blocks) >= 2:
-            # Asumir que el primero es test y el segundo command (o fix)
-            blocks["test"] = code_blocks[0].strip()
-            blocks["command"] = code_blocks[1].strip()
+            # Asumir que el primero es test y el segundo command
+            blocks["test"] = {"code": code_blocks[0][1].strip(), "lang": code_blocks[0][0]}
+            blocks["command"] = {"code": code_blocks[1][1].strip(), "lang": code_blocks[1][0]}
+        elif len(code_blocks) == 1:
+            blocks["test"] = {"code": code_blocks[0][1].strip(), "lang": code_blocks[0][0]}
     return blocks
 
 
+# ----------------------------------------------------------------------
 def get_prompt(config, state_name, vulnerability, placeholders=None):
     """Obtiene el prompt para un estado, reemplazando placeholders manualmente."""
     state_prompts = config.get("state_prompts", {})
@@ -139,15 +169,36 @@ def get_prompt(config, state_name, vulnerability, placeholders=None):
 
 
 # ----------------------------------------------------------------------
+def read_vulnerable_file(repo_path, vuln_file):
+    """Lee el contenido del archivo vulnerable y devuelve su texto o cadena vacía si error."""
+    file_path = Path(repo_path) / vuln_file
+    try:
+        if file_path.exists():
+            return file_path.read_text()
+        else:
+            log(f"Archivo no encontrado: {file_path}", state="error")
+            return ""
+    except Exception as e:
+        log(f"Error leyendo archivo {file_path}: {e}", state="error")
+        return ""
+
+
+# ----------------------------------------------------------------------
 def phase_test_design(config, model_config, vulnerability, repo_path, api_key, max_iter):
     model_display = model_config["model"]
     temperature = model_config.get("temperature", 0.1)
     max_tokens = model_config.get("max_tokens", 4000)
 
     log("Starting test design", model_display, state="test_designing")
+
+    vuln_file = vulnerability.get("file", "")
+    file_content = read_vulnerable_file(repo_path, vuln_file)
+
     placeholders = {
         "repo_path": repo_path,
-        "vuln_file": vulnerability.get("file", "")  # ruta relativa del archivo vulnerable
+        "vuln_file": vuln_file,
+        "file_content": file_content,
+        "line": vulnerability.get("line", 0)
     }
     prompt = get_prompt(config, "test_designing", vulnerability, placeholders)
 
@@ -156,7 +207,7 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
     for attempt in range(1, max_iter + 1):
         log(f"Attempt {attempt}/{max_iter}", model_display, state="test_designing")
         result = call_openrouter(model_display, prompt, api_key, temperature, max_tokens)
-        
+
         if not result["success"]:
             log(f"LLM call failed (sleeping): {result['error']}", model_display, state="test_designing")
             time.sleep(5 * attempt)
@@ -167,22 +218,21 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
         debug_path.write_text(response)
 
         blocks = extract_code_blocks(response)
-        test_code = blocks.get("test", "")
-        command = blocks.get("command", "")
+        test_block = blocks.get("test", {})
+        test_code = test_block.get("code", "")
+        test_lang = test_block.get("lang", "")
+        command_block = blocks.get("command", {})
+        command = command_block.get("code", "")
 
         if not test_code or not command:
             log("Missing test code or command block", model_display, state="test_designing")
             prompt = f"ERROR: La respuesta anterior no contenía los bloques requeridos. Debes incluir [test] y [command] con el formato especificado.\n\nRespuesta anterior (incorrecta):\n{response}\n\nGenera una nueva respuesta con el formato correcto."
             continue
 
-        # Determinar extensión del test según el lenguaje detectado en el bloque de código
-        # Por simplicidad, asumimos .c para C/C++ y .sh para bash. Podríamos mejorarlo.
-        test_filename = "tdh_test.c"  # por defecto
-        if "bash" in response or "sh" in response:
-            test_filename = "tdh_test.sh"
-        elif "python" in response:
-            test_filename = "tdh_test.py"
-        test_path = Path(repo_path) / test_filename
+        # Determinar extensión del archivo de test según el lenguaje
+        ext_map = {"c": ".c", "cpp": ".cpp", "bash": ".sh", "sh": ".sh", "python": ".py", "py": ".py"}
+        test_ext = ext_map.get(test_lang.lower(), ".c")
+        test_path = Path(repo_path) / f"tdh_test{test_ext}"
 
         try:
             test_path.write_text(test_code)
@@ -191,7 +241,7 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
 
             eval_prompt = f"Output:\n{output_log}\nExit code: {retcode}\nDid it reproduce the bug? Answer YES or NO."
             eval_res = call_openrouter(model_display, eval_prompt, api_key, temperature=0.0, max_tokens=100)
-            
+
             if eval_res["success"] and eval_res["content"].strip().upper().startswith("YES"):
                 success = True
                 log("Test successfully reproduced the vulnerability!", model_display, state="test_designing")
@@ -212,11 +262,17 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
     max_tokens = model_config.get("max_tokens", 4000)
 
     log("Starting fix design", model_display, state="fix_designing")
+
+    vuln_file = vulnerability.get("file", "")
+    file_content = read_vulnerable_file(repo_path, vuln_file)
+
     placeholders = {
         "test_code": test_code,
         "test_command": test_command,
         "repo_path": repo_path,
-        "vuln_file": vulnerability.get("file", "")
+        "vuln_file": vuln_file,
+        "file_content": file_content,
+        "line": vulnerability.get("line", 0)
     }
     prompt = get_prompt(config, "fix_designing", vulnerability, placeholders)
 
@@ -225,7 +281,7 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
     for attempt in range(1, max_iter + 1):
         log(f"Attempt {attempt}/{max_iter}", model_display, state="fix_designing")
         result = call_openrouter(model_display, prompt, api_key, temperature, max_tokens)
-        
+
         if not result["success"]:
             log(f"LLM call failed: {result['error']}", model_display, state="fix_designing")
             time.sleep(5 * attempt)
@@ -236,15 +292,16 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
         debug_path.write_text(response)
 
         blocks = extract_code_blocks(response)
-        fix_code = blocks.get("fix", "")
-        fix_command = blocks.get("command", test_command)
+        fix_block = blocks.get("fix", {})
+        fix_code = fix_block.get("code", "")
+        command_block = blocks.get("command", {})
+        fix_command = command_block.get("code", test_command)
 
         if not fix_code:
             log("Missing fix code block", model_display, state="fix_designing")
             prompt = f"ERROR: La respuesta anterior no contenía el bloque [fix]. Respuesta:\n{response}\n\nGenera una nueva respuesta con el bloque [fix]."
             continue
 
-        vuln_file = vulnerability.get("file")
         if not vuln_file:
             log("No file specified in vulnerability", model_display, state="fix_designing")
             break
@@ -260,14 +317,14 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
 
             eval_prompt = f"Output after fix:\n{output_log}\nIs the vulnerability still present? Answer YES if still present, NO if fixed."
             eval_res = call_openrouter(model_display, eval_prompt, api_key, temperature=0.0, max_tokens=100)
-            
-            if eval_res["success"] and eval_res["content"].strip().upper().startswith("NO"): # NO = fixed
+
+            if eval_res["success"] and eval_res["content"].strip().upper().startswith("NO"):
                 success = True
                 break
             else:
                 prompt = f"Fix failed. Output:\n{output_log}\nTry again."
         except Exception as e:
-            log(f"Error: {e}")
+            log(f"Error: {e}", model_display, state="fix_designing")
             prompt = f"Error: {e}. Try again."
 
     return fix_code, fix_command, success, output_log
@@ -277,7 +334,7 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
 def phase_document(config, model_config, vulnerability, test_code, fix_code, t_ok, f_ok, api_key):
     model_display = model_config["model"]
     log("Starting documentation", model_display, state="documenting")
-    
+
     placeholders = {
         "test_code": test_code,
         "fix_code": fix_code,
@@ -285,7 +342,7 @@ def phase_document(config, model_config, vulnerability, test_code, fix_code, t_o
         "fix_verified": "YES" if f_ok else "NO"
     }
     prompt = get_prompt(config, "documenting", vulnerability, placeholders)
-    
+
     result = call_openrouter(model_display, prompt, api_key)
     return result["content"] if result["success"] else "Documentation failed."
 
@@ -320,7 +377,7 @@ def main():
 
     # Flow
     t_code, t_cmd, t_ok, _ = phase_test_design(config, model_config, vulnerability, repo_path, api_key, max_iter)
-    
+
     if not t_ok:
         log("Test phase failed, exiting", model_config["model"], state="failed")
         output = {
@@ -332,9 +389,8 @@ def main():
         sys.exit(1)
 
     f_code, f_cmd, f_ok, _ = phase_fix_design(config, model_config, vulnerability, t_code, t_cmd, repo_path, api_key, max_iter)
-    
-    summary = f"Test: {t_ok}, Fix: {f_ok}"
-    explanation = phase_document(config, model_config, vulnerability, t_code, f_code, summary, api_key)
+
+    explanation = phase_document(config, model_config, vulnerability, t_code, f_code, t_ok, f_ok, api_key)
 
     output = {
         "status": "success",

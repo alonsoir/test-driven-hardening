@@ -1,48 +1,79 @@
-vagrant@tdh-engine-dev:~/tdh-engine$ python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git 
+(venv) vagrant@tdh-engine-dev:~/tdh-engine$ python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git
 INFO:core.docker_manager:Conectando a Docker via from_env()
 INFO:core.docker_manager:✅ Conectado a Docker correctamente
-INFO:core.docker_manager:Conectando a Docker via from_env()
-INFO:core.docker_manager:✅ Conectado a Docker correctamente
-INFO:__main__:🚀 Ejecutando análisis orquestado para https://github.com/alonsoir/test-zeromq-c-.git
-INFO:core.sast_orchestrator:🚀 Iniciando análisis para https://github.com/alonsoir/test-zeromq-c-.git
-INFO:core.sast_orchestrator:🐳 Creando contenedor para claude-3-5...
-INFO:core.docker_manager:📁 Volumen creado: /tmp/tdh-volumes/tdh-claude-3-5-fd1580b7
-INFO:core.docker_manager:🐳 Creando contenedor tdh-claude-3-5-fd1580b7...
-INFO:core.docker_manager:⏳ Esperando a que el contenedor se inicie...
-INFO:core.docker_manager:📦 Clonando repositorio https://github.com/alonsoir/test-zeromq-c-.git...
-INFO:core.docker_manager:✅ Repositorio clonado
-INFO:core.docker_manager:✅ Contenedor creado exitosamente: tdh-claude-3-5-fd1580b7
-INFO:core.sast_orchestrator:🔍 Ejecutando análisis SAST...
-INFO:core.sast_orchestrator:🛠️  Ejecutando cppcheck...
-INFO:core.sast_orchestrator:🛠️  Ejecutando bandit...
-INFO:core.sast_orchestrator:🛠️  Ejecutando semgrep...
-INFO:core.sast_orchestrator:📊 Analizando código localmente...
-INFO:core.sast_pipeline:🔍 Iniciando análisis SAST en: /tmp/tmp102m1i6b
-INFO:core.sast_pipeline:🛠️  Ejecutando cppcheck: cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --suppress=unmatchedSuppression --xml --xml-version=2 --output-file=/tmp/tmpinw5bp3j.xml --platform=unix64 --std=c++11 --std=c99 /tmp/tmp102m1i6b
-INFO:core.sast_pipeline:🛠️  Ejecutando flawfinder: flawfinder --quiet --dataonly --csv --context /tmp/tmp102m1i6b
-INFO:core.sast_pipeline:🛠️  Ejecutando bandit: bandit -r -f json -o /tmp/tmp3enbooz7.json -lll /tmp/tmp102m1i6b
-INFO:core.sast_pipeline:🛠️  Ejecutando semgrep: semgrep --config auto --json -o /tmp/tmp1a7sw2ux.json --metrics off --no-rewrite-rule-ids /tmp/tmp102m1i6b
-INFO:core.sast_pipeline:🛠️  Ejecutando trivy: trivy fs --security-checks vuln,config,secret --format json --output /tmp/tmprs7avtgg.json --severity CRITICAL,HIGH,MEDIUM,LOW /tmp/tmp102m1i6b
-WARNING:core.sast_pipeline:semgrep output file is empty or doesn't exist: /tmp/tmp1a7sw2ux.json
-INFO:core.sast_pipeline:📊 bandit encontró 0 vulnerabilidades
+INFO:__main__:============================================================
+INFO:__main__:🚀 ORQUESTACIÓN MULTI‑SOTA para https://github.com/alonsoir/test-zeromq-c-.git
+INFO:__main__:============================================================
+INFO:core.sast_orchestrator:🔐 Secretos cargados correctamente
+INFO:core.sast_orchestrator:🚀 Iniciando orquestación SAST multi‑SOTA
+INFO:core.sast_orchestrator:🔍 Ejecutando análisis SAST en https://github.com/alonsoir/test-zeromq-c-.git
+INFO:core.sast_orchestrator:🔍 Ejecutando análisis SAST en https://github.com/alonsoir/test-zeromq-c-.git
+INFO:core.sast_orchestrator:📦 Clonando repositorio a /tmp/tmp5vxx3z4e
+INFO:core.sast_pipeline:🔍 Iniciando análisis SAST en: /tmp/tmp5vxx3z4e
+INFO:core.sast_pipeline:🛠️  Ejecutando cppcheck: cppcheck --enable=all --inconclusive --suppress=missingIncludeSystem --suppress=unmatchedSuppression --xml --xml-version=2 --output-file=/tmp/tmp6rbo0oo1.xml --platform=unix64 --std=c++11 --std=c99 /tmp/tmp5vxx3z4e
+INFO:core.sast_pipeline:🛠️  Ejecutando flawfinder: flawfinder --quiet --dataonly --csv --context /tmp/tmp5vxx3z4e
+INFO:core.sast_pipeline:🛠️  Ejecutando bandit: bandit -r -f json -o /tmp/tmp5rcyoj5w.json -lll /tmp/tmp5vxx3z4e
+ERROR:core.sast_pipeline:Error ejecutando bandit: [Errno 13] Permission denied: 'bandit'
+INFO:core.sast_pipeline:🛠️  Ejecutando semgrep: semgrep --config auto --json -o /tmp/tmpdyato2nw.json --metrics off --no-rewrite-rule-ids /tmp/tmp5vxx3z4e
+ERROR:core.sast_pipeline:Error ejecutando semgrep: [Errno 13] Permission denied: 'semgrep'
+INFO:core.sast_pipeline:🛠️  Ejecutando trivy: trivy fs --security-checks vuln,config,secret --format json --output /tmp/tmp43pynhp0.json --severity CRITICAL,HIGH,MEDIUM,LOW /tmp/tmp5vxx3z4e
 INFO:core.sast_pipeline:📊 flawfinder encontró 1089 vulnerabilidades
 INFO:core.sast_pipeline:📊 cppcheck encontró 142 vulnerabilidades
 INFO:core.sast_pipeline:📊 trivy encontró 0 vulnerabilidades/configuraciones
 INFO:core.sast_pipeline:Marcando como falso positivo: unusedFunction
 ...
 INFO:core.sast_pipeline:✅ Análisis completado. Vulnerabilidades encontradas: 1183
-INFO:core.sast_orchestrator:🧹 Limpiando contenedor...
-INFO:core.docker_manager:🧹 Contenedor limpiado: tdh-claude-3-5-fd1580b7
-INFO:core.sast_pipeline:💾 Resultados guardados en: results/analysis_test-zeromq-c-
+INFO:core.sast_orchestrator:✅ SAST completado. 1183 vulnerabilidades encontradas.
+INFO:core.sast_orchestrator:Vulnerabilidades totales: 1183
+INFO:core.sast_orchestrator:Vulnerabilidades HIGH/CRITICAL: 14
+WARNING:core.sast_orchestrator:Demasiadas vulnerabilidades, procesando solo las primeras 2
+INFO:core.sast_orchestrator:Clonando https://github.com/alonsoir/test-zeromq-c-.git en /tmp/tdh-worktrees/repo
+INFO:core.sast_orchestrator:Creando worktree tdh-fix/syntaxError-20260216_121528_987280 en /tmp/tdh-worktrees/tdh-fix/syntaxError-20260216_121528_987280
+INFO:core.sast_orchestrator:[TASK:0152db51] Estado → worktree_created
+INFO:core.sast_orchestrator:Creando worktree tdh-fix/ctuOneDefinitionRuleViolation-20260216_121552_953173 en /tmp/tdh-worktrees/tdh-fix/ctuOneDefinitionRuleViolation-20260216_121552_953173
+INFO:core.sast_orchestrator:[TASK:b8e3254f] Estado → worktree_created
+INFO:core.sast_orchestrator:✅ Archivo encontrado: firewall-acl-agent/src/core/ipset_wrapper.cpp
+INFO:core.sast_orchestrator:📄 Archivo de input creado en /tmp/tdh-worktrees/tdh-fix/syntaxError-20260216_121528_987280/input.json
+INFO:core.sast_orchestrator:✅ El archivo existe, tamaño: 350 bytes
+INFO:core.sast_orchestrator:[TASK:0152db51] Estado → container_started
+ERROR:core.sast_orchestrator:🔍 DEBUG - Salida del agente (primeros 500 chars): [SOTA:anthropic/claude-3.5-sonnet][STATE:initialized] Starting autonomous agent
+[SOTA:anthropic/claude-3.5-sonnet][STATE:test_designing] Starting test design
+[SOTA:anthropic/claude-3.5-sonnet][STATE:test_designing] Attempt 1/3
+[SOTA:anthropic/claude-3.5-sonnet][STATE:test_designing] Test successfully reproduced the vulnerability!
+[SOTA:anthropic/claude-3.5-sonnet][STATE:fix_designing] Starting fix design
+[SOTA:anthropic/claude-3.5-sonnet][STATE:fix_designing] Attempt 1/3
+[SOTA:anthropic/claude-3
+ERROR:core.sast_orchestrator:🔍 DEBUG - Logs del contenedor (primeros 500 chars): 
+INFO:core.sast_orchestrator:[TASK:0152db51] Estado → failed
+INFO:core.sast_orchestrator:✅ Archivo encontrado: contrib/qwen/pca_pipeline/synthetic_data_generator.cpp
+INFO:core.sast_orchestrator:📄 Archivo de input creado en /tmp/tdh-worktrees/tdh-fix/ctuOneDefinitionRuleViolation-20260216_121552_953173/input.json
+INFO:core.sast_orchestrator:✅ El archivo existe, tamaño: 465 bytes
+INFO:core.sast_orchestrator:[TASK:b8e3254f] Estado → container_started
+ERROR:core.sast_orchestrator:🔍 DEBUG - Salida del agente (primeros 500 chars): [SOTA:google/gemma-3-27b-it:free][STATE:initialized] Starting autonomous agent
+[SOTA:google/gemma-3-27b-it:free][STATE:test_designing] Starting test design
+[SOTA:google/gemma-3-27b-it:free][STATE:test_designing] Attempt 1/3
+[SOTA:google/gemma-3-27b-it:free][STATE:test_designing] LLM call failed (sleeping): 429 Client Error: Too Many Requests for url: https://openrouter.ai/api/v1/chat/completions
+[SOTA:google/gemma-3-27b-it:free][STATE:test_designing] Attempt 2/3
+[SOTA:google/gemma-3-27b-it:free]
+ERROR:core.sast_orchestrator:🔍 DEBUG - Logs del contenedor (primeros 500 chars): 
+INFO:core.sast_orchestrator:[TASK:b8e3254f] Estado → failed
+ERROR:core.sast_orchestrator:Tarea 0152db51 falló: Agente falló con código 1
+ERROR:core.sast_orchestrator:Tarea b8e3254f falló: Agente falló con código 1
+INFO:core.sast_orchestrator:📊 Reporte guardado en results/orchestration_results_20260216_121701.json
 
 ============================================================
-✅ ANÁLISIS ORQUESTADO COMPLETADO
+📊 REPORTE DE ORQUESTACIÓN
 ============================================================
-Contenedor: tdh-claude-3-5-fd1580b7
-Vulnerabilidades encontradas: 1183
-Output: results/analysis_test-zeromq-c-
+Total tareas:          2
+Completadas:           0
+Fallidas:              2
+Pull Requests creadas: 0
+
+📋 Detalle por tarea:
+  ❌ [anthropic/claude-3.5-sonnet] syntaxError - syntaxError -> failed
+       Error: Agente falló con código 1
+  ❌ [google/gemma-3-27b-it:free] ctuOneDefinitionRuleViolation - ctuOneDefinitionRuleViolation -> failed
+       Error: Agente falló con código 1
 ============================================================
 
-📋 RECOMENDACIONES PARA LLM:
-  • Implementar pruebas unitarias específicas para casos de borde
-  • Revisar la gestión de memoria en funciones críticas
+📄 Reporte detallado guardado en: results/orchestration_20260216_121701.json
