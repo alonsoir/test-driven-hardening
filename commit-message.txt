@@ -1,7 +1,13 @@
-git add docker/sota_agent.py config/llm_council.yaml
-git commit -m "fix(agent): mejorar prompt test_designing y retroalimentación
+### 📦 Mensaje de commit sugerido
 
-- Añade contenido del archivo vulnerable en el prompt.
-- Instruye a no crear nuevos archivos fuente.
-- Agrega log de salida del test cuando falla.
-- Reduce tiempos de espera en rate limiting."
+```bash
+git commit -m "feat(agent): implementar contexto persistente y retroalimentación detallada
+
+- Carga única de skills (core, test_design, fix_design, documentation) al iniciar el contenedor.
+- Mantiene contexto (archivo vulnerable, análisis SAST) durante toda la vida del agente.
+- En phase_test_design, el prompt base incluye skills + análisis + archivo.
+- En reintentos, añade feedback completo: código del test, comando, salida, código retorno.
+- Implementa logging persistente en archivo dentro del worktree para trazabilidad.
+- El orquestador incluye ahora 'sast_analysis' detallado en input.json.
+
+Esto soluciona el problema de desviación del modelo en test_designing y permite depuración exhaustiva."

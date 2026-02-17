@@ -58,11 +58,11 @@ llm_configs:
 # Configuración del consejo (selección, votación, tiempos)
 # ----------------------------------------------------------------------
 council_settings:
-  min_llms: 3
-  max_llms: 3
-  preferred_count: 3          # Impar para votación
+  min_llms: 1
+  max_llms: 1
+  preferred_count: 1          # Impar para votación
   timeout_seconds: 300
-  enable_discussion: true
+  enable_discussion: false
 
 # ----------------------------------------------------------------------
 # Configuración de la máquina de estados (por fase)
@@ -82,228 +82,47 @@ state_machine_settings:
 # El script sota_agent.py solo debe formatearlos con las variables.
 # ----------------------------------------------------------------------
 state_prompts:
-
-  # Estado: Análisis inicial de la vulnerabilidad
-  analyzing:
-    system: |
-      Eres un experto en seguridad de código. Analiza la siguiente vulnerabilidad en detalle:
-
-      {vulnerability}
-
-      Proporciona:
-      1. Una descripción técnica de la causa raíz.
-      2. El impacto potencial.
-      3. Una estrategia de mitigación de alto nivel.
-      4. El archivo y línea exacta donde se produce.
-
-      No incluyas código aún. Sé conciso pero completo.
-    temperature: 0.1
-
-  # Estado: Diseño y validación del test
   test_designing:
     system: |
-      Eres un ingeniero de pruebas de seguridad. Debes crear un test que reproduzca la vulnerabilidad.
-
       Vulnerabilidad a reproducir:
       {vulnerability}
 
-      El repositorio está disponible en: {repo_path}
-      El archivo vulnerable es: {repo_path}/{vuln_file}
-      Línea aproximada: {line}
+      Archivo: {repo_path}/{vuln_file}
+      Línea: {line}
 
-      Contenido actual del archivo:
+      Contenido actual:
       ```cpp
       {file_content}
       ```
-
-      El proyecto contiene un Makefile y herramientas de compilación estándar (gcc, make, etc.) para lenguajes compilados.
-
-      **Instrucciones de salida (obligatorias):**
-      - El test debe demostrar la vulnerabilidad en el archivo indicado. Puedes escribir un script que compile o ejecute ese archivo y verifique que se produce el error esperado.
-      - Debes generar **dos bloques**:
-        1. Un bloque `[test]` con el código del test (script bash, programa C, Python, etc.).
-        2. Un bloque `[command]` con el comando exacto para ejecutar el test.
-
-      **Formato obligatorio:**
-
-      [test]
-      ```lenguaje
-      # código del test aquí
-      ```
-
-      [command]
-      ```bash
-      comando para ejecutar el test
-      ```
-
-      **Ejemplos:**
-      - Para una vulnerabilidad de sintaxis en C++:
-        [test]
-        ```bash
-        #!/bin/bash
-        g++ -c /workspace/firewall-acl-agent/src/core/ipset_wrapper.cpp 2>&1 | grep -q "error"
-        exit $?
-        ```
-        [command]
-        ```bash
-        bash test.sh
-        ```
-
-      - Para una vulnerabilidad de desbordamiento de búfer en C:
-        [test]
-        ```c
-        #include <stdlib.h>
-        int main() { return system("./vulnerable_program argumento_largo"); }
-        ```
-        [command]
-        ```bash
-        gcc -o test test.c && ./test
-        ```
-
-      Recibirás feedback sobre la ejecución. Si el test no reproduce la vulnerabilidad, itera hasta lograrlo (máximo 3 intentos).
     temperature: 0.2
 
-  # Estado: Diseño y verificación del fix
   fix_designing:
     system: |
-      Eres un ingeniero de seguridad que debe corregir la vulnerabilidad. Tienes el test que la reproduce y debes aplicar un fix que elimine la vulnerabilidad sin romper la funcionalidad.
-
       Vulnerabilidad a corregir:
       {vulnerability}
 
-      Archivo afectado: {repo_path}/{vuln_file}
-      Línea aproximada: {line}
+      Archivo: {repo_path}/{vuln_file}
+      Línea: {line}
 
-      Contenido actual del archivo:
+      Contenido actual:
       ```cpp
       {file_content}
       ```
 
-      Test que reproduce la vulnerabilidad:
+      Test que reproduce:
       {test_code}
 
-      Comando para ejecutar el test:
+      Comando de test:
       {test_command}
-
-      **Instrucciones de salida (obligatorias):**
-      - El **código corregido** debe ser el contenido completo del archivo después de aplicar la corrección. Colócalo en un bloque `[fix]`.
-      - El **comando** para verificar el fix (normalmente el mismo comando del test) debe ir en un bloque `[command]`.
-      - No incluyas texto fuera de estos bloques. Si no puedes generar un fix, proporciona un análisis en un bloque `[analysis]` explicando por qué.
-
-      **Formato obligatorio:**
-
-      [fix]
-      ```lenguaje
-      // código completo del archivo corregido
-      ```
-
-      [command]
-      ```bash
-      comando para verificar el fix
-      ```
-
-      **Ejemplo para una vulnerabilidad de sintaxis en C++:**
-
-      Archivo original (ipset_wrapper.cpp) tenía un error de sintaxis en línea 73. El test falla al compilar. El fix corrige la sintaxis.
-
-      [fix]
-      ```cpp
-      #include <ipset_wrapper.h>
-      // ... resto del archivo corregido ...
-      ```
-
-      [command]
-      ```bash
-      g++ -c /workspace/firewall-acl-agent/src/core/ipset_wrapper.cpp
-      ```
-
-      Recibirás feedback de la ejecución del test tras aplicar el fix. Si la vulnerabilidad persiste, itera hasta corregirla (máximo 3 intentos).
     temperature: 0.1
 
-  # Estado: Documentación final
   documenting:
     system: |
-      Eres un documentador técnico especializado en seguridad. Redacta una explicación clara y profesional.
+      Vulnerabilidad: {vulnerability}
+      Test: {test_code}
+      Fix: {fix_code}
+      Verificación: test_verified={test_verified}, fix_verified={fix_verified}
 
-      Vulnerabilidad:
-      {vulnerability}
-
-      Test utilizado:
-      {test_code}
-
-      Fix aplicado:
-      {fix_code}
-
-      Resultado de la verificación:
-      - Test reproducido: {test_verified}
-      - Fix verificado: {fix_verified}
-
-      Escribe una explicación que incluya:
-      - Qué hacía el código vulnerable.
-      - Cómo el test demuestra el problema.
-      - En qué consiste el fix y por qué es seguro.
-      - Lecciones aprendidas.
-
-      **No incluyas bloques de código** (ya se incluirán en el PR). Solo texto plano.
+      Escribe una explicación en texto plano.
     temperature: 0.1
 
-# ----------------------------------------------------------------------
-# Prompts para la SOTA orquestadora (sustituye o complementa a sast_orchestrator.py)
-# ----------------------------------------------------------------------
-orchestrator_prompts:
-  main:
-    system: |
-      Eres el orquestador principal del TDH Engine. Tu misión es coordinar el flujo completo de análisis y reparación de vulnerabilidades.
-
-      **Entrada:**
-      - Resultados SAST (JSON con vulnerabilidades, filtradas a HIGH/CRITICAL).
-      - Repositorio de destino (URL o ruta local).
-      - Consejo de SOTAS disponible (llm_configs).
-      - Configuración del consejo (council_settings).
-
-      **Tareas:**
-
-      1. **Inicialización**
-         - Clona el repositorio (si es remoto) o verifica acceso local.
-         - Crea un directorio de trabajo.
-
-      2. **Filtrado y priorización**
-         - Selecciona solo vulnerabilidades HIGH y CRITICAL.
-         - Ordena por gravedad y CWE.
-
-      3. **Asignación de tareas**
-         - Por cada vulnerabilidad, selecciona una SOTA del consejo (round‑robin, prioridad, o basado en experiencia).
-         - Crea un **worktree** aislado por vulnerabilidad: `git worktree add ../repo-{vuln-id} -b sota/{model}/{cwe} HEAD`.
-         - Prepara el contenedor Docker con la imagen `tdh-base`, montando el worktree.
-
-      4. **Ejecución de SOTAS**
-         - Lanza los contenedores en paralelo (o secuencial según recursos).
-         - Inyecta vía stdin: modelo, vulnerabilidad, ruta del worktree, API key.
-         - Captura logs en tiempo real y actualiza la máquina de estados.
-
-      5. **Gestión de estados**
-         - Mantén un registro de cada tarea: estado (pendiente, en test, en fix, documentado, PR listo, fallido).
-         - Si una SOTA falla, reasigna a otra (hasta `max_retries`).
-
-      6. **Generación de Pull Requests**
-         - Por cada vulnerabilidad con fix verificado:
-           - Haz commit de los cambios en el worktree.
-           - Haz push de la rama al remoto.
-           - Crea una Pull Request vía API de GitHub, incluyendo:
-             - Título: `fix: {cwe} - {descripción corta}`
-             - Cuerpo: explicación generada por la SOTA + test y fix en formato markdown.
-
-      7. **Limpieza**
-         - Elimina worktrees y contenedores terminados.
-         - Persiste el estado si está configurado.
-
-      **Formato de salida (para el engine):**
-      - Logs detallados con prefijo `[ORCHESTRATOR]`.
-      - Al final, un JSON resumen con:
-        - vulnerabilidades procesadas,
-        - fixes exitosos,
-        - URLs de PRs,
-        - errores.
-
-      Ejecuta este flujo de forma autónoma. No necesitas intervención humana.
-    temperature: 0.1

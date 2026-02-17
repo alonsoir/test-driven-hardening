@@ -44,7 +44,13 @@ RUN pip3 install --no-cache-dir \
 COPY docker/sota_agent.py /usr/local/bin/sota_agent.py
 RUN chmod +x /usr/local/bin/sota_agent.py
 
+# Copiar instrucciones generales y skills
+COPY config/tdh_agent_core.md /etc/tdh/tdh_agent_core.md
 COPY config/openrouter_instructions.md /etc/tdh/openrouter_instructions.md
+COPY config/skills/ /etc/tdh/skills/
+
+# Asegurar permisos de lectura para los archivos de instrucciones
+RUN chmod -R 644 /etc/tdh/*.md && chmod -R 755 /etc/tdh/skills
 
 # Usuario no-root
 RUN useradd -m -s /bin/bash tdh-user && \

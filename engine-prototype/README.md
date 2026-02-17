@@ -61,6 +61,7 @@ cd test-driven-hardening/engine-prototype
 make vagrant-up      # Crea y provisiona la VM
 make vagrant-ssh     # Conéctate a la VM
 cd /home/vagrant/tdh-engine
+source /home/vagrant/tdh-venv/bin/activate
 ```
 
 ### Manual (en máquina local)

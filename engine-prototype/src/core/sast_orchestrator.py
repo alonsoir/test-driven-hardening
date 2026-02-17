@@ -271,7 +271,7 @@ class SASTOrchestrator:
             return self._empty_result()
 
         # (Opcional) Limitar a un máximo para pruebas
-        MAX_VULNS = 2  # Ajusta según necesidad
+        MAX_VULNS = 1  # Ajusta según necesidad
         if len(filtered_vulns) > MAX_VULNS:
             logger.warning(f"Demasiadas vulnerabilidades, procesando solo las primeras {MAX_VULNS}")
             filtered_vulns = filtered_vulns[:MAX_VULNS]

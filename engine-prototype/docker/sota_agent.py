@@ -52,15 +52,27 @@ def load_config(config_path=None):
 
 
 # ----------------------------------------------------------------------
-def call_openrouter(model_id, prompt, api_key, temperature=0.1, max_tokens=4000, max_retries=5):
-    """Call OpenRouter API with retries and backoff for rate limiting."""
-    # Leer instrucciones extra si existen
-    instructions_path = Path("/etc/tdh/openrouter_instructions.md")
-    if instructions_path.exists():
-        extra_instructions = instructions_path.read_text()
-        system_prompt = extra_instructions + "\n\n" + prompt
-    else:
-        system_prompt = prompt
+def load_skill_instructions(skill_name):
+    """Carga las instrucciones específicas de un skill."""
+    skill_path = Path(f"/etc/tdh/skills/{skill_name}/SKILL.md")
+    if skill_path.exists():
+        return skill_path.read_text() + "\n\n"
+    return ""
+
+
+def load_agent_core():
+    """Carga las instrucciones generales del agente."""
+    core_path = Path("/etc/tdh/tdh_agent_core.md")
+    if core_path.exists():
+        return core_path.read_text() + "\n\n"
+    return ""
+
+
+def call_openrouter(model_id, prompt, api_key, temperature=0.1, max_tokens=4000, max_retries=5, skill=""):
+    """Call OpenRouter API with retries and backoff for rate limiting, including skill instructions."""
+    core_instructions = load_agent_core()
+    skill_instructions = load_skill_instructions(skill)
+    system_prompt = core_instructions + skill_instructions + prompt
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -79,7 +91,7 @@ def call_openrouter(model_id, prompt, api_key, temperature=0.1, max_tokens=4000,
         try:
             resp = requests.post(OPENROUTER_API_BASE, headers=headers, json=payload, timeout=120)
             if resp.status_code == 429:
-                wait = 2 ** attempt * 5  # 10, 20, 40, 80, 160 segundos
+                wait = 2 ** attempt * 2  # 4, 8, 16, 32, 64 segundos
                 log(f"Rate limited (429). Retrying in {wait}s (attempt {attempt}/{max_retries})", state="api")
                 time.sleep(wait)
                 continue
@@ -206,7 +218,14 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
 
     for attempt in range(1, max_iter + 1):
         log(f"Attempt {attempt}/{max_iter}", model_display, state="test_designing")
-        result = call_openrouter(model_display, prompt, api_key, temperature, max_tokens)
+        result = call_openrouter(
+            model_display,
+            prompt,
+            api_key,
+            temperature,
+            max_tokens,
+            skill="test_design"
+        )
 
         if not result["success"]:
             log(f"LLM call failed (sleeping): {result['error']}", model_display, state="test_designing")
@@ -240,7 +259,14 @@ def phase_test_design(config, model_config, vulnerability, repo_path, api_key, m
             output_log = stdout + stderr
 
             eval_prompt = f"Output:\n{output_log}\nExit code: {retcode}\nDid it reproduce the bug? Answer YES or NO."
-            eval_res = call_openrouter(model_display, eval_prompt, api_key, temperature=0.0, max_tokens=100)
+            eval_res = call_openrouter(
+                model_display,
+                eval_prompt,
+                api_key,
+                temperature=0.0,
+                max_tokens=100,
+                skill="evaluation"  # podríamos tener un skill específico para evaluación
+            )
 
             if eval_res["success"] and eval_res["content"].strip().upper().startswith("YES"):
                 success = True
@@ -280,7 +306,14 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
 
     for attempt in range(1, max_iter + 1):
         log(f"Attempt {attempt}/{max_iter}", model_display, state="fix_designing")
-        result = call_openrouter(model_display, prompt, api_key, temperature, max_tokens)
+        result = call_openrouter(
+            model_display,
+            prompt,
+            api_key,
+            temperature,
+            max_tokens,
+            skill="fix_design"
+        )
 
         if not result["success"]:
             log(f"LLM call failed: {result['error']}", model_display, state="fix_designing")
@@ -316,7 +349,14 @@ def phase_fix_design(config, model_config, vulnerability, test_code, test_comman
             output_log = stdout + stderr
 
             eval_prompt = f"Output after fix:\n{output_log}\nIs the vulnerability still present? Answer YES if still present, NO if fixed."
-            eval_res = call_openrouter(model_display, eval_prompt, api_key, temperature=0.0, max_tokens=100)
+            eval_res = call_openrouter(
+                model_display,
+                eval_prompt,
+                api_key,
+                temperature=0.0,
+                max_tokens=100,
+                skill="evaluation"
+            )
 
             if eval_res["success"] and eval_res["content"].strip().upper().startswith("NO"):
                 success = True
@@ -343,7 +383,12 @@ def phase_document(config, model_config, vulnerability, test_code, fix_code, t_o
     }
     prompt = get_prompt(config, "documenting", vulnerability, placeholders)
 
-    result = call_openrouter(model_display, prompt, api_key)
+    result = call_openrouter(
+        model_display,
+        prompt,
+        api_key,
+        skill="documentation"
+    )
     return result["content"] if result["success"] else "Documentation failed."
 
 
