@@ -1,108 +1,325 @@
-📋 Prompt de Continuidad – Día 2026-02-18
+## 📋 Prompt de Continuidad – Día 2026-02-18
 
-✅ Resumen de lo que hemos avanzado
+### 🧠 Contexto actual
+Estamos desarrollando el motor **TDH (Test Driven Hardening)** con filosofía **OpenClaw**: cada modelo (agente SOTA) debe tener una personalidad definida por **skills imperecederos** (`test_design`, `fix_design`, `documentation`) y **contexto persistente** (análisis SAST, archivo vulnerable) durante toda su vida en el contenedor. La comunicación con el orquestador se realiza mediante logs detallados que permitan trazar cada decisión.
 
-Contexto del problema: La ejecución del orquestador TDH muestra que los agentes SOTA fallan en la fase test_designing (test_failed) debido a una retroalimentación insuficiente cuando un test no reproduce la vulnerabilidad. El modelo pierde el contexto original (skills, archivo vulnerable, análisis SAST) y comienza a crear nuevos archivos o a desviarse, como se observó en ejecuciones anteriores.
+Hasta ahora:
+- Tenemos definidos los skills en `config/skills/*/SKILL.md`.
+- El agente `sota_agent.py` lee una tarea desde `stdin` y ejecuta las fases `test_designing`, `fix_designing`, `documenting`.
+- El orquestador (`sast_orchestrator.py`) lanza contenedores, monta el worktree y pasa la tarea en `input.json`.
+- En las ejecuciones recientes, la fase `test_designing` ha fallado tras 3 intentos con el estado `test_failed`.
 
-Filosofía OpenClaw: Hemos definido que el comportamiento del modelo debe estar guiado por instrucciones imperecederas (skills) que se cargan una sola vez al inicio del contenedor y persisten durante toda la vida del agente (máximo 3 intentos). El contenedor debe comunicarse con el orquestador mediante logs detallados que capturen todo el contexto, prompts, respuestas y salidas de comandos.
+### 🐞 Problema detectado
+El fallo se debe a que, cuando un test no reproduce la vulnerabilidad, la retroalimentación que recibe el modelo es insuficiente:
 
-Análisis de la situación actual:
+```python
+# Código actual en phase_test_design (simplificado)
+prompt = f"Previous test failed to reproduce. Output:\n{output_log}\nTry again. Remember the format."
+```
 
-En sota_agent.py, la función phase_test_design recarga el prompt base en cada intento, pero el prompt base no incluye el contexto completo (skills, análisis SAST) si no se le pasa explícitamente.
-La función call_openrouter vuelve a cargar las skills y core instructions en cada llamada, lo que es ineficiente y propenso a errores.
-El orquestador no proporciona un análisis SAST detallado en el input.json, solo un objeto vulnerability con campos mínimos.
-Los logs actuales son insuficientes para trazar el comportamiento del agente.
-Decisiones tomadas:
-Contexto persistente en el contenedor: Al iniciar sota_agent.py, se cargarán:
-tdh_agent_core.md (instrucciones generales).
-Los skills específicos (test_design/SKILL.md, fix_design/SKILL.md, documentation/SKILL.md).
-El contenido completo del archivo vulnerable.
-El análisis SAST detallado (proporcionado por el orquestador).
-Todo esto se almacenará en un objeto de contexto que se pasará a las fases.
-Comunicación mediante logs: Cada contenedor generará un archivo de log (por ejemplo, tdh_agent_<vuln_id>.log) en el worktree, que contendrá:
-El contexto completo al inicio.
-Para cada intento: el prompt enviado al modelo, la respuesta completa, los comandos ejecutados y sus salidas.
-Estos logs serán accesibles por el orquestador al finalizar la tarea.
-Mejora del prompt de test_designing: El prompt base incluirá:
-Core instructions + skill test_design.
-El análisis SAST detallado.
-La vulnerabilidad (con archivo, línea, descripción).
-El contenido del archivo vulnerable.
-Instrucciones claras sobre el formato [test] y [command] y la obligación de usar el archivo real.
-Retroalimentación en caso de fallo: Cuando un test falla, se añadirá al prompt un bloque de feedback con:
-El código de test usado.
-El comando ejecutado y su salida completa (stdout/stderr).
-El código de retorno.
-Un recordatorio de las reglas del skill.
-El prompt para el siguiente intento será: base_prompt + feedback (sin perder el contexto original).
-🎯 Plan de acción para mañana (2026-02-18)
+Esto provoca que el modelo **pierda el contexto original** (skills, archivo vulnerable, análisis SAST) y empiece a generar tests que crean nuevos archivos o se desvían de las instrucciones, como se observó en ejecuciones previas.
 
-🔹 Fase 1 – Modificar sota_agent.py para contexto persistente
-En main(), cargar:
-core_instructions (load_agent_core)
-skill_test, skill_fix, skill_doc (load_skill_instructions)
-Leer file_content del archivo vulnerable (ruta absoluta)
-Obtener sast_analysis del campo task.get("sast_analysis", "")
-Crear un diccionario context con todo lo anterior + vulnerability, repo_path, api_key, model_config, max_iter.
-Eliminar las llamadas a load_agent_core y load_skill_instructions dentro de call_openrouter (ahora el prompt ya las incluirá).
-🔹 Fase 2 – Rediseñar phase_test_design
-Construir base_prompt usando el contexto:
+Además:
+- El análisis SAST que se envía al modelo es solo un resumen (campos básicos), no la salida detallada de la herramienta que justifica por qué se marcó esa línea como vulnerable.
+- Los logs actuales no capturan el contexto completo (prompts enviados, respuestas, comandos ejecutados), lo que dificulta la depuración.
 
-base_prompt = f"{context['core']}\n{context['skills']['test_design']}\n\n## Análisis SAST\n{context['sast_analysis']}\n\n## Vulnerabilidad\n{json.dumps(context['vulnerability'], indent=2)}\n\n## Archivo vulnerable\n**Ruta:** {context['vulnerability']['file']}\n**Contenido:**\n```cpp\n{context['file_content']}\n```\n\n## Instrucciones\nDebes generar un test que reproduzca la vulnerabilidad. Recuerda usar el archivo real y el formato [test] y [command].\n"
+### 🔍 Causa raíz
+1. **Falta de persistencia del contexto**: cada llamada al modelo reconstruye el prompt desde cero, perdiendo las instrucciones imperecederas (skills) y la información del archivo/SAST.
+2. **Retroalimentación pobre**: el modelo no recibe suficiente información sobre por qué falló su test anterior, ni se le recuerdan explícitamente las reglas (no crear archivos, usar el archivo real, estrategia para errores de sintaxis).
+3. **Ausencia de análisis SAST detallado**: el modelo no sabe exactamente qué detectó la herramienta, solo un identificador y una línea.
 
-En cada intento, llamar a call_openrouter con prompt (que puede ser base_prompt o base_prompt + feedback).
-Al fallar, construir feedback con los detalles del intento y asignar prompt = base_prompt + "\n\n" + feedback.
-Asegurar que el feedback incluya un recordatorio explícito de no crear nuevos archivos.
-🔹 Fase 3 – Mejorar el logging
-En phase_test_design (y análogamente en fix_design), abrir un archivo de log en modo append (tdh_agent_<vuln_id>.log) en el directorio del worktree.
-Escribir al inicio: contexto completo (skills, análisis SAST, contenido del archivo).
-Por cada intento, escribir:
-=== INTENTO {attempt} ===
-PROMPT:\n{prompt}
-RESPUESTA DEL MODELO:\n{response}
-CÓDIGO DE TEST EXTRAÍDO:\n{test_code}
-COMANDO EJECUTADO:\n{command}
-SALIDA:\n{output_log}
-CÓDIGO DE RETORNO: {retcode}
-ÉXITO: {success}
-Al finalizar la fase, escribir === FIN DE FASE ===.
-🔹 Fase 4 – Actualizar el orquestador para enviar análisis SAST detallado
-En sast_orchestrator.py, modificar _run_sast para que al crear Vulnerability se incluya en additional_properties la salida completa de la herramienta que detectó el problema (por ejemplo, raw_output del resultado SAST).
-En _generate_task_input, añadir el campo "sast_analysis": task.vulnerability.additional_properties.get("tool_output", "").
-Asegurar que este campo se incluya en el input.json que se pasa al contenedor.
-🔹 Fase 5 – Pruebas
-Reconstruir la imagen base: make build-base o docker build -f docker/Dockerfile.base -t tdh-base:latest .
-Ejecutar el orquestador sobre el repositorio de prueba:
-bash
-python tdh_unified.py sast-orchestrated https://github.com/alonsoir/test-zeromq-c-.git
-Observar los logs del contenedor (en el worktree) y verificar:
-El contexto completo aparece al inicio.
-En cada intento, el modelo recibe el prompt adecuado.
-Si falla, el feedback incluye toda la información.
-El modelo no crea archivos nuevos.
-Si la vulnerabilidad es un falso positivo, documentar el comportamiento y considerar añadir en el futuro una detección de falsos positivos.
-🔹 Fase 6 – (Opcional) Mejorar la evaluación del test
-En lugar de preguntar al modelo si el test reproduce el bug, podríamos usar una heurística para errores de sintaxis (código de retorno != 0 y presencia de "error" en la salida). Pero por ahora mantener la evaluación por LLM con un prompt más específico.
-📝 Tareas concretas para mañana
+### 🎯 Solución propuesta
+Rediseñar `sota_agent.py` para que:
 
-Modificar sota_agent.py (fases 1, 2 y 3).
-Modificar sast_orchestrator.py (fase 4).
-Reconstruir imagen Docker y probar.
-Analizar logs y ajustar prompts si es necesario.
-⚠️ Supuestos y riesgos
+1. **Al iniciar el contenedor**, cargue de una vez:
+   - Instrucciones generales (`tdh_agent_core.md`).
+   - Skills específicos (`test_design/SKILL.md`, `fix_design/SKILL.md`, `documentation/SKILL.md`).
+   - Contenido completo del archivo vulnerable.
+   - Análisis SAST detallado (incluido en la tarea desde el orquestador).
+2. **Mantenga este contexto en memoria** (variables globales o un objeto de contexto) durante todas las iteraciones (hasta 3 intentos por fase).
+3. **En cada llamada al modelo**, use un prompt compuesto por:
+   - El contexto persistente (skills + análisis + archivo).
+   - La instrucción específica de la fase.
+   - En caso de reintento, **feedback enriquecido** con:
+     - Código del test anterior.
+     - Comando ejecutado y su salida completa.
+     - Código de retorno.
+     - Recordatorio explícito de las reglas del skill.
+4. **Registre todo** en un archivo de log dentro del worktree (ej. `tdh_agent_<vuln_id>.log`) que contenga:
+   - Contexto completo cargado al inicio.
+   - Prompts enviados en cada intento.
+   - Respuestas del modelo.
+   - Comandos ejecutados y sus salidas.
+   - Resultado final (éxito/fallo).
+5. **Modifique `call_openrouter`** para que ya no cargue skills (ahora se cargan una sola vez al inicio).
 
-El análisis SAST detallado puede ser muy extenso; habrá que limitarlo a un tamaño razonable (ej. primeras 1000 líneas) para no saturar el contexto del modelo.
-Los modelos gratuitos pueden seguir teniendo rate limiting; considerar usar modelos de pago si es necesario.
-La persistencia del contexto en el contenedor asume que el contenedor vive durante toda la tarea (máx 3 intentos). Esto ya es así.
-📦 Mensaje de commit para mañana
+Además, en el orquestador (`sast_orchestrator.py`):
+- Enriquecer el objeto `vulnerability` con el campo `sast_analysis` que contenga la salida completa de la herramienta que detectó el problema (por ejemplo, el mensaje de error de cppcheck o semgrep).
+- Incluir este campo en el `input.json` que se pasa al agente.
 
-text
-feat(agent): contexto persistente y logs trazables en agente SOTA
+### 📝 Tareas concretas para mañana
 
-- Se carga core y skills una sola vez al inicio del contenedor.
-- El análisis SAST detallado se incluye en el input.json y se pasa al agente.
-- En test_design, el prompt base incluye todo el contexto (skills, análisis, archivo).
-- En caso de fallo, se añade feedback detallado sin perder el contexto original.
-- Se genera un archivo de log por vulnerabilidad con prompts, respuestas y salidas.
-- Se elimina recarga innecesaria de skills en call_openrouter.
-Este prompt de continuidad te permitirá retomar mañana exactamente donde lo dejamos, con todas las tareas claramente definidas. ¡Éxito con la implementación!
+1. **Modificar `sota_agent.py`**:
+   - En `main()`, cargar core y skills una sola vez.
+   - Leer el archivo vulnerable y el análisis SAST de la tarea.
+   - Crear un diccionario `context` con toda esta información.
+   - Pasar `context` a las funciones de fase (`phase_test_design`, etc.).
+   - En `phase_test_design`, construir el prompt base a partir del `context`.
+   - En cada iteración, si falla, generar feedback detallado y añadirlo al prompt (sin perder el base).
+   - Implementar logging persistente en archivo.
+
+2. **Modificar `call_openrouter`**:
+   - Eliminar las llamadas a `load_agent_core()` y `load_skill_instructions()`.
+   - Aceptar el prompt ya completo.
+
+3. **Modificar `sast_orchestrator.py`**:
+   - En `_run_sast`, al crear `Vulnerability`, incluir en `additional_properties` el campo `tool_output` con la salida cruda de la herramienta (si está disponible en el resultado del pipeline SAST).
+   - En `_generate_task_input`, añadir `"sast_analysis": task.vulnerability.additional_properties.get("tool_output", "")`.
+
+4. **Probar** con el repositorio de prueba `https://github.com/alonsoir/test-zeromq-c-.git` y verificar que:
+   - En el primer intento, el test usa el archivo real.
+   - Si falla (porque no hay error real), el segundo intento recibe feedback completo y sigue usando el archivo real.
+   - Los logs generados contienen toda la información necesaria.
+
+5. **Evaluar** si tras 3 intentos fallidos podemos considerar la vulnerabilidad como posible falso positivo y marcarla en el reporte.
+
+### ⚠️ Riesgos y consideraciones
+- El prompt puede crecer mucho si se concatenan muchos intentos. Con un máximo de 3 intentos por fase, es aceptable. Si en el futuro se aumentan los intentos, habría que considerar un enfoque con historial de mensajes.
+- Asegurarse de que el análisis SAST detallado no contenga información sensible (no debería, es código).
+- Verificar que el logging no consuma demasiado espacio; los logs se borrarán al eliminar el worktree (al final de la orquestación o tras un tiempo).
+
+
+```
+
+Este es un analisis que he desarrollado con ChatGPT, yo creo que es el camino adecuado. Analizalo, dime que te parece y decidimos si seguir con el camino que tenemos descrito arriba o merece más la pena este camino:
+
+# TDH Engine — Deterministic Orchestrator Action Plan
+
+## Objective
+
+Build a deterministic manager (orchestrator) that allows LLM SOTA agents to safely analyze, reproduce, and fix vulnerabilities inside isolated repositories without human interaction.
+
+The manager is the only component allowed to execute commands. Models only propose actions.
+
+---
+
+## Core Principle
+
+The system is not an autonomous coding agent.
+It is a transactional experimentation runtime over source code.
+
+Models propose.
+Manager validates, executes, records, and reverts.
+
+---
+
+## Phase 1 — Deterministic Single‑Model Loop (Mandatory First Goal)
+
+Goal: Fully automatic cycle using ONE model and ONE bug.
+No multi‑model logic yet.
+
+### Required Tools (only 5 initially)
+
+1. read_file
+2. search (grep-like)
+3. write_file (with backup)
+4. compile
+5. run_binary
+
+If this phase is not stable → stop development. Do not add features.
+
+---
+
+## System Components
+
+### 1. Manager (Central Process)
+
+Responsibilities:
+
+* Clone repository
+* Create container per agent
+* Create worktree per agent
+* Execute tools requested by model
+* Maintain state machine
+* Handle backups and rollback
+* Run tests and compilation
+* Provide structured results back to model
+* Record experiment history
+
+The manager is the only executor of shell commands.
+
+Models never directly access the system.
+
+---
+
+### 2. Agent (LLM SOTA)
+
+The agent produces structured action requests.
+It never executes anything.
+
+Example action request:
+{
+"action": "write_file",
+"path": "src/parser.cpp",
+"content": "...",
+"backup": true
+}
+
+Manager validates → executes → returns structured result.
+
+---
+
+### 3. Container Environment
+
+Each agent has:
+
+* Dedicated container
+* Dedicated worktree
+* No network access
+* CPU/RAM limits
+* Execution timeout
+
+Filesystem is never shared between agents.
+
+---
+
+## Transactional State Machine
+
+Every attempt is a reversible transaction.
+
+STATE_N
+-> model proposes change
+-> manager applies change (creates backup)
+-> compile
+-> run test
+-> collect result
+-> if failure: rollback
+-> return to STATE_N
+
+No corrupted state can persist.
+
+---
+
+## Required Manager Subsystems
+
+### Workspace Controller
+
+* Create worktrees
+* Reset to clean state
+* Snapshot revision hashes
+
+### Backup Engine
+
+* Automatic backup before modification
+* Restore on failure
+* Track modified files list
+
+### Tool Executor
+
+Allowed commands only through controlled wrappers:
+
+* read_file
+* search
+* write_file
+* compile
+* run_binary
+
+All outputs normalized to structured JSON.
+
+### Result Interpreter
+
+Convert raw execution into structured response:
+
+* success/failure
+* compiler errors
+* runtime errors
+* stdout/stderr
+* exit code
+
+### State Tracker
+
+For each attempt store:
+
+* diff
+* result
+* duration
+* files touched
+* reproducibility
+
+---
+
+## Model Interaction Protocol
+
+Loop:
+
+1. Manager sends context
+2. Model returns action JSON
+3. Manager executes
+4. Manager returns structured result
+5. Repeat
+
+No natural language execution instructions allowed.
+Only structured actions.
+
+---
+
+## Success Criteria (Phase 1 Complete)
+
+The system automatically:
+
+1. Reads code
+2. Locates bug
+3. Creates reproducible test
+4. Compiles test
+5. Test fails (bug proven)
+6. Generates fix
+7. Compiles fix
+8. Test passes
+
+Without human intervention.
+
+---
+
+## Phase 2 — Multi‑Model Competition (Future)
+
+(Not to be implemented yet)
+
+Manager responsibilities later:
+
+* Share discovered tests
+* Validate reproducibility
+* Compare fixes
+* Produce candidate pull requests
+
+This stage only begins after Phase 1 is reliable.
+
+---
+
+## Non‑Goals (For Now)
+
+* No parallel models
+* No scoring systems
+* No voting
+* No ranking
+* No advanced tools
+* No internet access
+
+Simplicity first. Determinism first.
+
+---
+
+## Immediate Next Tasks
+
+1. Define action JSON schema
+2. Implement manager execution loop
+3. Implement file backup system
+4. Implement compile/run wrappers
+5. Run on one known C++ bug until stable
+
+Only after stability → expand capabilities.
+
+---
+
+## Guiding Rule
+
+If a human is needed during the loop, the system is not finished.
