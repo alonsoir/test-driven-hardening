@@ -1,61 +1,230 @@
-### **📄 Documento 3: `IMPLEMENTATION_PLAN.md`**
+# TDH Engine — Deterministic Orchestrator Action Plan
 
-```markdown
-# Test Driven Hardening - Implementation Plan (Prototype Phase)
+## Objective
 
-## Phase 0: Foundation & Setup (Week 1)
-**Goal**: Barebones orchestrator that can run a single step manually.
-- [ ] **Repository Structure**:
-tdh-engine-prototype/
-├── src/
-│ ├── orchestrator.py # Core state machine
-│ ├── models.py # Data classes (VulnerabilityTicket, etc.)
-│ └── logging_config.py
-├── tests/
-├── requirements.txt
-└── README.md
+Build a deterministic manager (orchestrator) that allows LLM SOTA agents to safely analyze, reproduce, and fix vulnerabilities inside isolated repositories without human interaction.
 
-text
-- [ ] **Basic `VulnerabilityTicket` class** with state enum for the 7 steps.
-- [ ] **Simple file-based persistence** (JSON) for tickets.
-- [ ] **Logging** structured to track step transitions.
+The manager is the only component allowed to execute commands. Models only propose actions.
 
-## Phase 1: Single-Agent Validation (Week 2)
-**Goal**: Automate Steps 1 & 2 with a single "Master" LLM (e.g., DeepSeek).
-- [ ] **`LLMCouncilClient` basic implementation** for one provider.
-- [ ] **Prompt templates** for Step 1 (Create PoC) and Step 3 (Initial Hypothesis).
-- [ ] **`TestBuildRunner`** to execute simple shell commands in a temporary directory.
-- [ ] **Integration test**: Feed a trivial SAST finding (e.g., "potential buffer overflow in dummy.c") and verify the PoC is generated.
+---
 
-## Phase 2: Multi-Agent Workspace Orchestration (Week 3)
-**Goal**: Implement Steps 3 & 4 (Council validation).
-- [ ] **`WorkspaceManager`** to create N isolated directories from a source repo.
-- [ ] Extend `Orchestrator` to distribute hypothesis and PoC to workspaces.
-- [ ] **`TestBuildRunner`** to run validation in each workspace and collect results.
-- [ ] **Consensus check**: Require all agents to confirm reproduction before proceeding.
+## Core Principle
 
-## Phase 3: Fix Generation & Empirical Selection (Week 4)
-**Goal**: Implement Steps 5, 6 & 7 (The core of TDH).
-- [ ] **Prompt template** for Step 5 (Fix hypothesis generation).
-- [ ] **`Orchestrator` logic** to apply each proposed fix to respective workspaces.
-- [ ] **`TestBuildRunner`** to compile and run PoC (must pass) and any existing test suite.
-- [ ] **`ConsensusEngine` basic version** to rank fixes based on success and a simplicity heuristic.
+The system is not an autonomous coding agent.
+It is a transactional experimentation runtime over source code.
 
-## Phase 4: Artifact Generation & CI Integration (Week 5)
-**Goal**: Close the loop and produce usable outputs.
-- [ ] **`ArtifactGenerator`** to create:
-    - A diff patch for the selected fix.
-    - A minimal `HardeningJournal` entry (JSON).
-    - A summary markdown report.
-- [ ] **Basic CI example**: A script that simulates a GitHub Action calling the TDH engine.
+Models propose.
+Manager validates, executes, records, and reverts.
 
-## Phase 5: From Prototype to Engine
-**Goal**: Evaluate, refine, and plan the C++ core.
-- [ ] **Benchmark & Profile**: Identify bottlenecks (likely workspace ops and LLM calls).
-- [ ] **Define C++ Core Interface**: Precisely specify the API of `Orchestrator` and `WorkspaceManager` for C++ port.
-- [ ] **Spike a C++ Module**: Port the `WorkspaceManager` to C++ as a proof-of-concept, called from Python via `ctypes` or `pybind11`.
+---
 
-## Development Principles
-- **Test-First for Logic**: Unit test the state machine and algorithms heavily.
-- **Integration Tests with Mocks**: Use mock LLM responses and simulated repos for CI.
-- **Configuration over Hardcoding**: All model choices, API keys, timeouts, paths should be configurable via a file or env vars.
+## Phase 1 — Deterministic Single‑Model Loop (Mandatory First Goal)
+
+Goal: Fully automatic cycle using ONE model and ONE bug.
+No multi‑model logic yet.
+
+### Required Tools (only 5 initially)
+
+1. read_file
+2. search (grep-like)
+3. write_file (with backup)
+4. compile
+5. run_binary
+
+If this phase is not stable → stop development. Do not add features.
+
+---
+
+## System Components
+
+### 1. Manager (Central Process)
+
+Responsibilities:
+
+* Clone repository
+* Create container per agent
+* Create worktree per agent
+* Execute tools requested by model
+* Maintain state machine
+* Handle backups and rollback
+* Run tests and compilation
+* Provide structured results back to model
+* Record experiment history
+
+The manager is the only executor of shell commands.
+
+Models never directly access the system.
+
+---
+
+### 2. Agent (LLM SOTA)
+
+The agent produces structured action requests.
+It never executes anything.
+
+Example action request:
+{
+"action": "write_file",
+"path": "src/parser.cpp",
+"content": "...",
+"backup": true
+}
+
+Manager validates → executes → returns structured result.
+
+---
+
+### 3. Container Environment
+
+Each agent has:
+
+* Dedicated container
+* Dedicated worktree
+* No network access
+* CPU/RAM limits
+* Execution timeout
+
+Filesystem is never shared between agents.
+
+---
+
+## Transactional State Machine
+
+Every attempt is a reversible transaction.
+
+STATE_N
+-> model proposes change
+-> manager applies change (creates backup)
+-> compile
+-> run test
+-> collect result
+-> if failure: rollback
+-> return to STATE_N
+
+No corrupted state can persist.
+
+---
+
+## Required Manager Subsystems
+
+### Workspace Controller
+
+* Create worktrees
+* Reset to clean state
+* Snapshot revision hashes
+
+### Backup Engine
+
+* Automatic backup before modification
+* Restore on failure
+* Track modified files list
+
+### Tool Executor
+
+Allowed commands only through controlled wrappers:
+
+* read_file
+* search
+* write_file
+* compile
+* run_binary
+
+All outputs normalized to structured JSON.
+
+### Result Interpreter
+
+Convert raw execution into structured response:
+
+* success/failure
+* compiler errors
+* runtime errors
+* stdout/stderr
+* exit code
+
+### State Tracker
+
+For each attempt store:
+
+* diff
+* result
+* duration
+* files touched
+* reproducibility
+
+---
+
+## Model Interaction Protocol
+
+Loop:
+
+1. Manager sends context
+2. Model returns action JSON
+3. Manager executes
+4. Manager returns structured result
+5. Repeat
+
+No natural language execution instructions allowed.
+Only structured actions.
+
+---
+
+## Success Criteria (Phase 1 Complete)
+
+The system automatically:
+
+1. Reads code
+2. Locates bug
+3. Creates reproducible test
+4. Compiles test
+5. Test fails (bug proven)
+6. Generates fix
+7. Compiles fix
+8. Test passes
+
+Without human intervention.
+
+---
+
+## Phase 2 — Multi‑Model Competition (Future)
+
+(Not to be implemented yet)
+
+Manager responsibilities later:
+
+* Share discovered tests
+* Validate reproducibility
+* Compare fixes
+* Produce candidate pull requests
+
+This stage only begins after Phase 1 is reliable.
+
+---
+
+## Non‑Goals (For Now)
+
+* No parallel models
+* No scoring systems
+* No voting
+* No ranking
+* No advanced tools
+* No internet access
+
+Simplicity first. Determinism first.
+
+---
+
+## Immediate Next Tasks
+
+1. Define action JSON schema
+2. Implement manager execution loop
+3. Implement file backup system
+4. Implement compile/run wrappers
+5. Run on one known C++ bug until stable
+
+Only after stability → expand capabilities.
+
+---
+
+## Guiding Rule
+
+If a human is needed during the loop, the system is not finished.

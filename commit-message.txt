@@ -1,13 +1,16 @@
-### 📦 Mensaje de commit sugerido
+git add .
+git commit -m "Reinicio completo del proyecto hacia Deterministic Orchestrator
 
-```bash
-git commit -m "feat(agent): implementar contexto persistente y retroalimentación detallada
+- Eliminados todos los archivos obsoletos del prototipo anterior (scripts de prueba, resultados, utilidades).
+- Conservados únicamente docker_manager.py, config/skills/ (skills imperecederos) y opcionalmente requirements.txt y Makefile.
+- Actualizada toda la documentación clave para reflejar el nuevo diseño:
+  * README.md: visión general y filosofía TDH.
+  * ARCHITECTURE.md: componentes, flujo, herramientas, máquina transaccional.
+  * PROCESS_SPECIFICATION.md: fases, interacciones, criterios de éxito.
+  * SECURITY_GUARANTEES_FRAMEWORK.md: aislamiento, transaccionalidad, trazabilidad.
+  * RELATED_WORK.md: inspiración en Karpathy y OpenClaw.
+  * ROADMAP.md: fases 1, 2 y 3 con hitos concretos.
+  * AGENTS.md: rol de los agentes SOTA con skills persistentes.
+- Establecidas las bases para comenzar la implementación de la Fase 1 (deterministic single-model loop).
 
-- Carga única de skills (core, test_design, fix_design, documentation) al iniciar el contenedor.
-- Mantiene contexto (archivo vulnerable, análisis SAST) durante toda la vida del agente.
-- En phase_test_design, el prompt base incluye skills + análisis + archivo.
-- En reintentos, añade feedback completo: código del test, comando, salida, código retorno.
-- Implementa logging persistente en archivo dentro del worktree para trazabilidad.
-- El orquestador incluye ahora 'sast_analysis' detallado en input.json.
-
-Esto soluciona el problema de desviación del modelo en test_designing y permite depuración exhaustiva."
+Próximo paso: implementar el orquestador con las cinco herramientas básicas y validar el ciclo completo con un caso simple."

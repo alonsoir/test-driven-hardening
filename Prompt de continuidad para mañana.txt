@@ -1,0 +1,98 @@
+## 🧠 Prompt de continuidad para mañana.txt
+
+---
+
+## 📋 Prompt de Continuidad – Día 2026-02-19
+
+### 🧠 Contexto actual
+Hemos reiniciado por completo el desarrollo del motor **TDH (Test Driven Hardening)** con un nuevo diseño: **Deterministic Orchestrator**. La filosofía central es que **el modelo propone, el orquestador ejecuta**. Esto garantiza que nunca se corrompa el repositorio y que cada paso sea reversible.
+
+El repositorio está limpio y contiene:
+- Documentación actualizada (`README.md`, `ARCHITECTURE.md`, `PROCESS_SPECIFICATION.md`, `SECURITY_GUARANTEES_FRAMEWORK.md`, `RELATED_WORK.md`, `ROADMAP.md`, `AGENTS.md`).
+- `docker_manager.py`: lógica base para manejar contenedores Docker (reutilizable).
+- `config/skills/`: skills imperecederos para los tres roles (`test_design`, `fix_design`, `documentation`).
+- (Opcional) `requirements.txt` y `Makefile` para entornos de desarrollo.
+
+El objetivo inmediato es **implementar la Fase 1 del roadmap**: conseguir un ciclo completamente automático con un solo modelo y un solo bug, utilizando únicamente las cinco herramientas básicas (`read_file`, `search`, `write_file`, `compile`, `run_binary`).
+
+### 🎯 Objetivo de mañana
+Comenzar la implementación del orquestador (`sast_orchestrator.py` o similar) que:
+
+1. **Prepare el entorno**:
+   - Clone el repositorio objetivo.
+   - Cree un contenedor Docker aislado (sin red, con recursos limitados) usando `docker_manager.py`.
+   - Cree un worktree transaccional dentro del contenedor.
+   - Cargue los skills y el contexto inicial (archivo vulnerable + análisis SAST completo).
+
+2. **Implemente las cinco herramientas básicas** como wrappers controlados:
+   - `read_file`: leer archivo (validar ruta).
+   - `search`: búsqueda estilo grep (escapar patrones).
+   - `write_file`: escribir con backup automático.
+   - `compile`: compilar (con lista blanca de flags).
+   - `run_binary`: ejecutar binario (con argumentos y stdin controlados).
+
+3. **Establezca el bucle de interacción con el agente**:
+   - Enviar prompt inicial con contexto y skills.
+   - Recibir acción JSON del agente (vía OpenRouter).
+   - Validar acción, ejecutarla, capturar resultado.
+   - Si es `write_file`, desencadenar verificación (compilar y ejecutar test) según la fase.
+   - Gestionar reintentos (hasta 3) con feedback enriquecido.
+   - Registrar todo en un log detallado.
+
+### 🐞 Punto de partida
+No hay código del orquestador todavía. Empezaremos desde cero, pero podemos apoyarnos en `docker_manager.py` para la parte de contenedores. La estructura sugerida:
+
+```
+engine-prototype/
+├── orchestrator/
+│   ├── __init__.py
+│   ├── main.py               # Punto de entrada
+│   ├── docker_wrapper.py     # Reutilizar docker_manager.py
+│   ├── tools/                # Wrappers de las 5 herramientas
+│   │   ├── read.py
+│   │   ├── search.py
+│   │   ├── write.py
+│   │   ├── compile.py
+│   │   └── run.py
+│   ├── agent/                # Comunicación con el modelo
+│   │   └── openrouter_client.py
+│   └── state/                 # Máquina de estados y backups
+│       ├── transaction.py
+│       └── backup.py
+├── config/
+│   └── skills/
+├── requirements.txt
+└── Makefile
+```
+
+### 📝 Tareas concretas para mañana
+
+1. **Crear la estructura de directorios** y archivos base.
+2. **Implementar `docker_wrapper.py`** que use `docker_manager.py` para crear/destruir contenedores y worktrees.
+3. **Implementar los wrappers de las cinco herramientas** en `tools/`, cada uno como función que recibe parámetros y devuelve un dict estandarizado (`{"success": bool, "stdout": str, "stderr": str, "exit_code": int}`).
+4. **Crear el bucle principal** en `main.py` que:
+   - Lea la tarea desde `stdin` (formato JSON con repo, archivo, análisis SAST).
+   - Prepare el entorno.
+   - Cargue los skills.
+   - Inicie la fase de test (por ahora, fijaremos la fase para pruebas).
+   - Envíe el primer prompt al agente (usando `openrouter_client.py`).
+   - Procese la respuesta y ejecute la acción.
+   - Repita hasta completar la fase o agotar intentos.
+5. **Probar manualmente** con un caso muy simple (por ejemplo, un archivo C con buffer overflow conocido) y verificar que:
+   - El contenedor se crea correctamente.
+   - Las herramientas funcionan.
+   - El agente responde con JSON válido.
+   - Los backups se crean y restauran si falla la verificación.
+
+### ⚠️ Riesgos y consideraciones
+- La integración con OpenRouter puede requerir manejo de autenticación y rate limits. Usar variable de entorno `OPENROUTER_API_KEY`.
+- El prompt inicial debe ser muy claro: explicar las herramientas disponibles, el formato JSON, y recordar las reglas (no crear archivos nuevos, usar el archivo real, etc.).
+- La verificación automática tras `write_file` debe saber en qué fase estamos para saber qué compilar/ejecutar (por ahora, asumiremos fase de test y compilaremos `test_vuln.c` si existe, o similar).
+- Los logs deben escribirse en el worktree y también en un directorio externo para persistencia.
+
+### 🧭 Referencias útiles
+- [`ARCHITECTURE.md`](../ARCHITECTURE.md) – para recordar el diseño de componentes.
+- [`PROCESS_SPECIFICATION.md`](../PROCESS_SPECIFICATION.md) – para detalles del flujo y las fases.
+- [`config/skills/test_design/SKILL.md`](../config/skills/test_design/SKILL.md) – para entender qué se espera del agente en esa fase.
+
+Mañana empezamos con energía y mentalidad de construir paso a paso. ¡El objetivo es tener un prototipo rudimentario pero funcional al final del día!
